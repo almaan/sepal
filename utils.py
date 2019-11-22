@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 
+from enum import Enum
+from copy import deepcopy
+import re
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from enum import Enum
 
 from scipy.spatial import KDTree
 
 from typing import Tuple
+
+def print_params(func,*args,**kwargs):
+    def wrapper(*args,**kwargs):
+        print("Function : {} | Parameters : {} {} ".format(func.__name__,
+                                                           args,
+                                                           kwargs),
+             )    
+        return func(*args,**kwargs)
+    return wrapper
+
 
 def read_file(pth : str,
               index_col = 0,
@@ -19,19 +32,37 @@ def read_file(pth : str,
                      )
     return df
 
+def laplacian(centers : np.ndarray,
+              nbrs : np.ndarray,
+              h : float,
+              )-> np.ndarray:
+
+    d2f = nbrs.sum(axis = 1) - 4*centers
+    d2f = d2f / h**2
+
+    return d2f
+
+def filter_genes(mat,
+                 min_occur : int = 5,
+                 min_expr : int = 300,
+                 )->None:
+    keep_genes = (np.sum(mat.values > 0, axis = 0) > min_occur).astype(int)
+    keep_genes *= (np.sum(mat.values, axis = 0) > min_expr).astype(int)
+    keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) for x in mat.columns]).astype(int)
+    mat = mat.iloc[:,keep_genes.astype(bool)]
+    return mat
 
 class NeighbourSpecs(Enum):
-    VISIUM = 4
-    OLD = 4
+    TWOK = 4
+    ONEK = 4
 
 class RotateSpecs(Enum):
-    VISIUM = 45
-    OLD = 0
+    TWOK = 45
+    ONEK = 0
 
 class RadiusSpecs(Enum):
-    VISIUM = np.sqrt(2)
-    OLD = 1.0
-
+    TWOK = np.sqrt(2.0)
+    ONEK = 1.0
 
 class CountData:
     def __init__(self,
@@ -80,8 +111,6 @@ class CountData:
         
         return crd
 
-
-
     def _rotate(self,
                 rmat : np.ndarray,
                 )->None:
@@ -105,14 +134,16 @@ class CountData:
     def _remove_unsaturated(self,
                             )-> None:
 
-
         self.saturated = []
+        self.unsaturated = []
         for spot in range(self.S):
             nbr = self.kdt.query_ball_point(self.crd[spot,:],
                                             self.r + self.eps)
 
             if len(nbr) >= self.nn + 1:
                 self.saturated.append(spot)
+            else:
+                self.unsaturated.append(spot)
                 
         self.saturated = np.array(self.saturated).astype(int)
         self.saturated_idx = self.cnt.index[self.saturated]
@@ -168,3 +199,114 @@ class CountData:
         idxs = self.get_allnbr_idx(self.saturated)
 
         return (self.cnt.values[self.saturated,:],self.cnt.values[idxs,:])
+
+@print_params
+def propagate(cd : CountData,
+              thrs : float = 10e-8,
+              dt : float = 0.1,
+              stopafter : int = 10e5,
+              normalize : bool = True,
+              diffusion_rate : int = 1,
+              )-> np.ndarray:
+     
+
+    if normalize:
+        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
+        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+    else:
+        ncnt = cd.cnt.values
+    
+    # Get neighbour indices
+    nidx = cd.get_allnbr_idx(cd.saturated)
+
+    D = diffusion_rate
+    n_genes =  cd.G 
+    times = np.zeros(n_genes)
+
+    # Propagate in time
+    for gene in range(n_genes):
+        conc = ncnt[:,gene].astype(float)
+        conc[cd.unsaturated] = 0
+        maxDelta = np.inf
+        time = 0
+        while maxDelta > thrs :
+            if time / dt > stopafter:
+                genename = cd.cnt.columns[gene]
+                print("WARNING : Gene : {} did not convege".format(genename))
+                break
+            time +=dt
+            d2 = laplacian(conc[cd.saturated],conc[nidx],1)
+            dcdt = D*d2
+            conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt
+            times[gene] = time
+            maxDelta = np.max(np.abs(dcdt*dt)) / dcdt.shape[0]
+
+    return times
+
+def clean_axes(ax : plt.Axes,
+                )->None:
+
+        ax.set_aspect('equal')
+        ax.set_yticks([])
+        ax.set_xticks([])
+        for pos in ax.spines.keys():
+            ax.spines[pos].set_visible(False)
+
+def visualize_genes(cd : CountData,
+                    times : np.ndarray,
+                    n_genes : int = 20,
+                    ncols : int = 5,
+                    side_size : float = 3,
+                    qscale : float = None ,
+                    normalize : bool = True,
+                    pltargs : dict = None,
+                    ) -> Tuple:
+
+
+    if normalize:
+        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
+        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+    else:
+        ncnt = cd.cnt.values
+
+    topgenes = np.argsort(times)[::-1][0:n_genes]
+
+    nrows = np.ceil(n_genes / ncols).astype(int)
+
+    figsize = (1.2 * ncols * side_size,
+               1.2 * nrows * side_size)
+
+    fig,ax = plt.subplots(nrows,
+                          ncols,
+                          figsize=figsize)
+    ax = ax.flatten()
+
+    _pltargs = {'s':40,
+                'edgecolor':'black',
+                'cmap':plt.cm.PuRd,
+                }
+
+    if pltargs is not None:
+        for k,v in pltargs.items():
+            _pltargs[k] = v
+
+    for ii in range(n_genes):
+        vals = ncnt[:,topgenes[ii]].reshape(-1,)
+        if qscale is not None:
+            if qscale > 0 and qscale < 1:
+                vals_q = np.quantile(vals,qscale)
+                vals[vals > vals_q] = vals_q
+            else:
+                print('WARNING : {} is not a proper quantile value'.format(qscale),
+                      'within range (0,1)')
+
+        ax[ii].set_title('{}'.format(cd.cnt.columns[topgenes[ii]]))
+        ax[ii].scatter(cd.crd[:,0],
+                       cd.crd[:,1],
+                       c = vals,
+                       **_pltargs,
+                      )
+        clean_axes(ax[ii])
+
+    return (fig,ax)
+
