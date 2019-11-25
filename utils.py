@@ -32,7 +32,7 @@ def read_file(pth : str,
                      )
     return df
 
-def laplacian(centers : np.ndarray,
+def laplacian_rectilinear(centers : np.ndarray,
               nbrs : np.ndarray,
               h : float,
               )-> np.ndarray:
@@ -42,27 +42,26 @@ def laplacian(centers : np.ndarray,
 
     return d2f
 
+def laplacian_hexagonal(centers : np.ndarray,
+                        nbrs : np.ndarray,
+                        h : float,
+                        )-> np.ndarray:
+
+    d2f = nbrs.sum(axis = 1) - 6*centers
+    d2f = d2f / h**2 * 2 / 3
+
+    return d2f
+
 def filter_genes(mat,
                  min_occur : int = 5,
-                 min_expr : int = 300,
+                 min_expr : int = 0,
                  )->None:
+
     keep_genes = (np.sum(mat.values > 0, axis = 0) > min_occur).astype(int)
     keep_genes *= (np.sum(mat.values, axis = 0) > min_expr).astype(int)
     keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) for x in mat.columns]).astype(int)
     mat = mat.iloc[:,keep_genes.astype(bool)]
     return mat
-
-class NeighbourSpecs(Enum):
-    TWOK = 4
-    ONEK = 4
-
-class RotateSpecs(Enum):
-    TWOK = 45
-    ONEK = 0
-
-class RadiusSpecs(Enum):
-    TWOK = np.sqrt(2.0)
-    ONEK = 1.0
 
 class CountData:
     def __init__(self,
@@ -189,6 +188,31 @@ class CountData:
                                 narr[k,3] = nbrs[k][n]
 
             return narr.astype(int)
+        elif self.nn == 6:
+            eps = 0.2 # 11degs
+            for k,spot in enumerate(sel):
+                for n in range(0,self.nn+1):
+                    if nbrs[k][n] != spot:
+                        nvec =  self.crd[spot,:] - self.crd[nbrs[k][n],:]
+                        nvec = nvec / np.linalg.norm(nvec)
+                        if nvec[0] < 0:
+                            theta = np.arccos(-1*nvec[0])
+                            if np.abs(theta) < eps:
+                                narr[k,1] = nbrs[k][n]
+                            elif theta < np.pi/2 - eps and theta > eps:
+                                narr[k,3] = nbrs[k][n]
+                            else:
+                                narr[k,5] = nbrs[k][n]
+                        else:
+                            theta = np.arccos(nvec[0])
+                            if np.abs(theta) < eps:
+                                narr[k,0] = nbrs[k][n]
+                            elif theta < np.pi/2 - eps and theta > eps:
+                                narr[k,2] = nbrs[k][n]
+                            else:
+                                narr[k,4] = nbrs[k][n]
+            return narr.astype(int)
+                        
         else:
             print(f"Not implemented for this type of array")
             return None
@@ -222,6 +246,11 @@ def propagate(cd : CountData,
     D = diffusion_rate
     n_genes =  cd.G 
     times = np.zeros(n_genes)
+
+    if cd.nn == 4:
+        laplacian = laplacian_rectilinear
+    elif cd.nn == 6:
+        laplacian = laplacian_hexagonal
 
     # Propagate in time
     for gene in range(n_genes):

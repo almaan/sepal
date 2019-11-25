@@ -15,6 +15,7 @@ import matplotlib.pyplot as plt
 import utils as ut
 
 
+
 def main():
 
     prs = arp.ArgumentParser()
@@ -30,10 +31,23 @@ def main():
                      required = True,
                      help = 'output directory')
 
-    prs.add_argument('-fg','--filter_genes',
-                     type = bool,
-                     default = True,
-                     help = 'output directory')
+    prs.add_argument('-mo','--min_occurance',
+                     type = int,
+                     default = 5,
+                     help = ' '.join(['minimum number of spot',
+                                      'that gene has to occur within',
+                                      ],
+                                     )
+                     )
+
+    prs.add_argument('-mc','--min_counts',
+                     type = int,
+                     default = 20,
+                     help = ' '.join(['minimum number of total',
+                                      'counts for a gene',
+                                      ],
+                                     )
+                     )
 
     prs.add_argument('-ar','--array',
                      type = str,
@@ -55,6 +69,7 @@ def main():
     plt_prs.add_argument('-ss','--side_size',
                          required = False,
                          type = float,
+                         default = 3.5,
                          help = 'side length in plot',
                          )
 
@@ -74,23 +89,8 @@ def main():
                          help = 'quantile to use for quantile scaling',
                          )
 
-    pth = "/home/alma/Documents/PhD/papers/STSC/data/fetal_heart/st/w9/D2_CN31_st_data.processed.tsv"
-# TODO : remove and uncomment on launch 
-#    args = prs.parse_args()
-    args = prs.parse_args(['-c',
-                           pth,
-                           '-o',
-                           '/tmp/',
-                           '-ar',
-                           '1k',
-                           'plot',
-                           '-ss',
-                            '4.2',
-                           '-sd',
-                           '{"s" : 20, "edgecolor":"black"}',
-                           ],
-                          )
-    #TODO: laplacian function must be adjusted as well
+    args = prs.parse_args()
+
     if args.array == '1k':
         setup = dict(radius = 1,
                      rotate = None,
@@ -102,17 +102,35 @@ def main():
                      rotate = 45,
                      n_neighbours = 4,
                      )
+
     elif args.array == 'visium':
-        print("ERROR : method is not yet",
-              "implemented for {} arrays".format(args.array)
-              )
+        setup = dict(radius = np.sqrt(2),
+                     rotate = 45,
+                     n_neighbours = 4,
+                     )
+    else:
+        print('array type not supported')
         sys.exit(-1)
 
 
 
     for sample,cpth in enumerate(args.count_files):
+        sampletag = '.'.join(osp.basename(cpth).split('.')[0:-1])
         cnt = ut.read_file(cpth)
-        cnt = ut.filter_genes(cnt)
+        cnt.index = pd.Index([x.lstrip('X') for x in cnt.index])
+
+        if any([args.min_occurance > 0,args.min_counts > 0]):
+            print("Removing Genes With : ",
+                  "TOTAL_EXPR < {} | OCCURANCE < {}".format(args.min_counts,
+                                                            args.min_occurance))
+            cnt = ut.filter_genes(cnt,
+                                  min_occur = args.min_occurance,
+                                  min_expr = args.min_counts)
+
+        n_spots,n_genes = cnt.shape
+
+        print("GENES : {} | SPOTS : {}".format(n_genes,n_spots))
+
         cd = ut.CountData(cnt,
                           **setup, 
                           )
@@ -123,6 +141,10 @@ def main():
                               index = cd.cnt.columns,
                               columns = ['diff-time'],
                               )
+
+        if not osp.exists(args.out_dir):
+            os.mkdir(args.out_dir)
+
         out_df_pth = osp.join(args.out_dir,'diffusion-times.tsv')
 
         out_df.to_csv(out_df_pth,
@@ -138,9 +160,18 @@ def main():
                                         side_size = args.side_size,
                                         n_genes = args.n_genes,
                                         qscale = args.quantile_scaling,
+                                        pltargs = args.style_dict,
                                         )
-            fig.savefig(osp.join(args.out_dir,'diffusion-times.svg'))
+            fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
+                                                        'diffusion-times.svg']
+                                                       )
+                                 )
+                        )
 
-main()
+if __name__ == '__main__':
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("Terminated by user")
 
 
