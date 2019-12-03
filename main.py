@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 
-
 import os
 import sys
 import json
@@ -29,6 +28,12 @@ def main():
                      )
     prs.add_argument('-o','--out_dir',
                      required = True,
+                     help = 'output directory')
+
+    prs.add_argument('-t','--transpose',
+                     required = False,
+                     default = False,
+                     action = 'store_true',
                      help = 'output directory')
 
     prs.add_argument('-mo','--min_occurance',
@@ -73,7 +78,7 @@ def main():
                          help = 'side length in plot',
                          )
 
-    plt_prs.add_argument('-nc','--ncols',
+    plt_prs.add_argument('-nc','--n_cols',
                      type = int,
                      default = 5,
                      help = 'number f columns in plot')
@@ -87,6 +92,12 @@ def main():
                          default = None,
                          type = float,
                          help = 'quantile to use for quantile scaling',
+                         )
+
+    plt_prs.add_argument('-cl','--cluster',
+                         default = False,
+                         action = 'store_true',
+                         help = 'spaital clustering',
                          )
 
     args = prs.parse_args()
@@ -117,6 +128,8 @@ def main():
     for sample,cpth in enumerate(args.count_files):
         sampletag = '.'.join(osp.basename(cpth).split('.')[0:-1])
         cnt = ut.read_file(cpth)
+        if args.transpose:
+            cnt = cnt.T
         cnt.index = pd.Index([x.lstrip('X') for x in cnt.index])
 
         if any([args.min_occurance > 0,args.min_counts > 0]):
@@ -135,6 +148,7 @@ def main():
                           **setup, 
                           )
 
+        np.random.seed(1337)
         times = ut.propagate(cd)
 
         out_df = pd.DataFrame([str(x) for x in times],
@@ -145,7 +159,12 @@ def main():
         if not osp.exists(args.out_dir):
             os.mkdir(args.out_dir)
 
-        out_df_pth = osp.join(args.out_dir,'diffusion-times.tsv')
+        
+        out_df_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
+                                                                  'top',
+                                                                  'diffusion-times.tsv']
+                                                                 )
+                              )
 
         out_df.to_csv(out_df_pth,
                       sep = '\t',
@@ -156,17 +175,47 @@ def main():
         if 'plot' in args.modules:
             fig,ax = ut.visualize_genes(cd,
                                         times,
-                                        ncols = args.ncols,
+                                        ncols = args.n_cols,
                                         side_size = args.side_size,
                                         n_genes = args.n_genes,
                                         qscale = args.quantile_scaling,
                                         pltargs = args.style_dict,
                                         )
+
             fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
+                                                        'top',
                                                         'diffusion-times.svg']
                                                        )
                                  )
                         )
+
+            if args.cluster:
+               eigviz, clusterviz = ut.visualize_clusters(cd,
+                                                          times,
+                                                          args.n_genes,
+                                                          args.n_cols,
+                                                          pltargs = args.style_dict,
+                                                          )
+
+               patoname = osp.join(args.out_dir,'-'.join([sampletag,
+                                                          'patterns',
+                                                          'diffusion-times.svg'],
+                                                        )
+                                  )
+                                     
+
+               eigviz[0].savefig(patoname) 
+
+               for cluster in range(len(clusterviz)):
+                    clustoname = osp.join(args.out_dir,'-'.join([sampletag,
+                                                                'cluster',
+                                                                 str(cluster),
+                                                                'diffusion-times.svg'],
+                                                                )
+                                         )
+                    
+                    clusterviz[cluster][0].savefig(clustoname) 
+
 
 if __name__ == '__main__':
     try:

@@ -9,8 +9,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from scipy.spatial import KDTree
+from sklearn.cluster import AgglomerativeClustering as ACl
 
 from typing import Tuple
+
+from tqdm import tqdm
 
 def print_params(func,*args,**kwargs):
     def wrapper(*args,**kwargs):
@@ -52,6 +55,15 @@ def laplacian_hexagonal(centers : np.ndarray,
 
     return d2f
 
+def divergence_rectilinear(nbrs : np.ndarray,
+                           h : float,
+                           ) -> np.ndarray:
+
+    p1 = nbrs[:,1] - nbrs[:,0] / (2*h)
+    p2 = nbrs[:,3] - nbrs[:,2] / (2*h)
+
+    return p1 + p2
+
 def filter_genes(mat,
                  min_occur : int = 5,
                  min_expr : int = 0,
@@ -68,7 +80,7 @@ class CountData:
                  cnt : pd.DataFrame,
                  radius : float,
                  n_neighbours : int,
-                 eps : float = 10e-4,
+                 eps : float = 0.1,
                  rotate : int = None,
                  )-> None:
 
@@ -224,28 +236,36 @@ class CountData:
 
         return (self.cnt.values[self.saturated,:],self.cnt.values[idxs,:])
 
-@print_params
 def propagate(cd : CountData,
-              thrs : float = 10e-8,
-              dt : float = 0.1,
-              stopafter : int = 10e5,
+              thrs : float = 10e-10,
+              dt : float = 0.01,
+              stopafter : int = 10e10,
               normalize : bool = True,
               diffusion_rate : int = 1,
+              shuffle : bool = False,
               )-> np.ndarray:
-     
+
+    D = diffusion_rate
+    n_genes =  cd.G 
+    times = np.zeros(n_genes)
+    n_saturated = cd.saturated.shape[0]
+    print("{} Saturated Spots".format(n_saturated))
 
     if normalize:
         rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
         ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
     else:
         ncnt = cd.cnt.values
+
+    if shuffle:
+        shf = np.random.permutation(ncnt.shape[0])
+        ncnt = ncnt[shf,:]
+        iterable = range(n_genes)
+    else:
+        iterable = tqdm(range(n_genes))
     
     # Get neighbour indices
     nidx = cd.get_allnbr_idx(cd.saturated)
-
-    D = diffusion_rate
-    n_genes =  cd.G 
-    times = np.zeros(n_genes)
 
     if cd.nn == 4:
         laplacian = laplacian_rectilinear
@@ -253,20 +273,24 @@ def propagate(cd : CountData,
         laplacian = laplacian_hexagonal
 
     # Propagate in time
-    for gene in range(n_genes):
+    for gene in iterable:
         conc = ncnt[:,gene].astype(float)
-        conc[cd.unsaturated] = 0
+        q_95 = np.quantile(conc,0.95)
+        conc[conc > q_95] = q_95
+#        conc[cd.unsaturated] = 0
         maxDelta = np.inf
         time = 0
-        while maxDelta > thrs :
+        while maxDelta > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
                 print("WARNING : Gene : {} did not convege".format(genename))
                 break
             time +=dt
+
             d2 = laplacian(conc[cd.saturated],conc[nidx],1)
             dcdt = D*d2
-            conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt
+            conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
+            conc[conc < 0] = 0
             times[gene] = time
             maxDelta = np.max(np.abs(dcdt*dt)) / dcdt.shape[0]
 
@@ -299,7 +323,6 @@ def visualize_genes(cd : CountData,
         ncnt = cd.cnt.values
 
     topgenes = np.argsort(times)[::-1][0:n_genes]
-
     nrows = np.ceil(n_genes / ncols).astype(int)
 
     figsize = (1.2 * ncols * side_size,
@@ -329,7 +352,8 @@ def visualize_genes(cd : CountData,
                 print('WARNING : {} is not a proper quantile value'.format(qscale),
                       'within range (0,1)')
 
-        ax[ii].set_title('{}'.format(cd.cnt.columns[topgenes[ii]]))
+        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cd.cnt.columns[topgenes[ii]],
+                                                             times[topgenes[ii]]))
         ax[ii].scatter(cd.crd[:,0],
                        cd.crd[:,1],
                        c = vals,
@@ -338,4 +362,174 @@ def visualize_genes(cd : CountData,
         clean_axes(ax[ii])
 
     return (fig,ax)
+
+
+def get_eigenpatterns( mat : np.ndarray,
+                       thrs : float = 0.90,
+                       normalize : bool = True,
+                       )-> np.ndarray :
+
+
+    U,S,_ = np.linalg.svd(mat - mat.mean(axis = 1).reshape(-1,1))
+    nonzero = np.where(S > 0)[0]
+    evecs = U[:,nonzero]
+    evals = S**2 / mat.shape[0]
+
+    ncomps = np.cumsum(evals)
+    ncomps = np.argmax(ncomps / ncomps[-1] > thrs)
+
+    return evecs[:,0:ncomps]
+
+def get_eigenscores(mat,
+                    evecs,
+                    )-> np.ndarray:
+
+    coef = np.linalg.lstsq(evecs,
+                           mat,
+                           rcond = None)[0]
+
+    coef_norms = np.linalg.norm(coef,axis = 0)
+    normed_coefs = coef / coef_norms.reshape(1,-1)
+
+    return normed_coefs
+
+
+def get_eigen_dmat(eigenscores : np.ndarray,
+                   normalized : bool = True,
+                      ) -> np.ndarray :
+
+
+    n_pats = eigenscores.shape[1]
+    dmat = np.zeros((n_pats,n_pats))
+
+    if not normalized:
+        nrm = np.linalg.norm(eigenscores,axis = 0)
+        eigenscores = eigenscores / nrm.reshape(1,-1)
+
+    for ii in range(n_pats-1):
+        u = eigenscores[:,ii]
+        for jj in range(ii+1,n_pats):
+            v = eigenscores[:,jj]
+            dmat[ii,jj] = np.arccos(np.dot(u,v))
+            dmat[jj,ii] = dmat[ii,jj]
+
+    return dmat
+
+def cluster_patterns(dmat : np.ndarray,
+                     n_patterns : int,
+                     )-> np.ndarray:
+
+
+    if n_patterns > dmat.shape[0]:
+        string = ' '.join(["Number of patterns larger",
+                           "than number of samples"])
+        raise Exception(string)
+
+    cluster = ACl(n_clusters = n_patterns,
+                  affinity = 'precomputed',
+                  linkage = 'complete')
+
+    cidx = cluster.fit_predict(dmat)
+
+    return cidx
+
+def visualize_clusters(cd : CountData,
+                       times : np.ndarray,
+                       ntopgenes : np.ndarray,
+                       ncols : int,
+                       side_size : float = 3,
+                       pltargs : dict = None,
+                       normalize : bool = True,
+                       ):
+    
+    _pltargs = {'s':40,
+                'edgecolor':'black',
+                'cmap':plt.cm.PuRd,
+                }
+
+    if pltargs is not None:
+        for k,v in pltargs.items():
+            _pltargs[k] = v
+
+    toppatterns = np.argsort(times)[::-1][0:ntopgenes]
+    genes = cd.cnt.columns.values[toppatterns]
+    epats = get_eigenpatterns(cd.cnt.values[:,toppatterns])
+    n_patterns = epats.shape[1]
+    
+    nrows = np.ceil(n_patterns / ncols).astype(int)
+    figsize = (1.2 * ncols * side_size,
+               1.2 * nrows * side_size)
+
+    eigviz = list(plt.subplots(nrows,ncols,figsize = figsize))
+    eigviz[0].suptitle('Eigenpatterns')
+    eigviz[-1] = eigviz[-1].flatten()
+
+    for k in range(n_patterns):
+        eigviz[-1][k].scatter(cd.crd[:,0],cd.crd[:,1],
+                              c = epats[:,k],
+                              **_pltargs,
+                              )
+
+        eigviz[-1][k].set_aspect('equal')
+        clean_axes(eigviz[-1][k])
+        
+    if normalize:
+        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
+        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+    else:
+        ncnt = cd.cnt.values
+
+
+    escores = get_eigenscores(ncnt[:,toppatterns],epats)
+    labels = cluster_patterns(get_eigen_dmat(escores),
+                              n_patterns = n_patterns)
+
+    vizlist = []
+    uni_labels = np.unique(labels)
+
+    for k,lab in enumerate(uni_labels):
+        pos = np.where(labels == lab)[0]
+        nrows = np.ceil((labels == lab).sum() / ncols).astype(int)
+
+        figsize = (1.2 * ncols * side_size,
+                   1.2 * nrows * side_size)
+
+        vizlist.append(list(plt.subplots(nrows,
+                                         ncols,
+                                         figsize = figsize)))
+
+        vizlist[-1][0].suptitle("Eigengroup {}".format(k))
+
+        vizlist[-1][1] = vizlist[-1][1].flatten()
+
+        for ii in range((labels == lab).sum()):
+            vizlist[-1][1][ii].set_title("Gene : {}".format(genes[pos[ii]]))
+            vizlist[-1][1][ii].scatter(cd.crd[:,0],
+                                       cd.crd[:,1],
+                                       c = cd.cnt.values[:,toppatterns[pos[ii]]],
+                                       **_pltargs,
+                                       )
+
+            vizlist[-1][1][ii].set_aspect('equal')
+            clean_axes(vizlist[-1][1][ii])
+
+        for jj in range(ii+1,ncols*nrows):
+            clean_axes(vizlist[-1][1][jj])
+            vizlist[-1][1][jj].set_visible(False)
+
+    return (eigviz,vizlist)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
