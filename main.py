@@ -100,6 +100,14 @@ def main():
                          help = 'spaital clustering',
                          )
 
+    plt_prs.add_argument('-eps','--threshold',
+                         default = 0.8,
+                         type = float,
+                         help = 'threshold in clustering',
+                         )
+
+
+
     args = prs.parse_args()
 
     if args.array == '1k':
@@ -190,28 +198,30 @@ def main():
                         )
 
             if args.cluster:
-               eigviz, clusterviz = ut.visualize_clusters(cd,
+                args.threshold = np.clip(args.threshold,0,1)
+                eigviz, clusterviz = ut.visualize_clusters(cd,
                                                           times,
                                                           args.n_genes,
                                                           args.n_cols,
+                                                          threshold = args.threshold,
                                                           pltargs = args.style_dict,
                                                           )
 
-               patoname = osp.join(args.out_dir,'-'.join([sampletag,
+                patoname = osp.join(args.out_dir,'-'.join([sampletag,
                                                           'patterns',
                                                           'diffusion-times.svg'],
                                                         )
                                   )
                                      
 
-               eigviz[0].savefig(patoname) 
+                eigviz[0].savefig(patoname) 
 
-               for cluster in range(len(clusterviz)):
+                for cluster in range(len(clusterviz)):
                     clustoname = osp.join(args.out_dir,'-'.join([sampletag,
                                                                 'cluster',
                                                                  str(cluster),
                                                                 'diffusion-times.svg'],
-                                                                )
+                                                                 )
                                          )
                     
                     clusterviz[cluster][0].savefig(clustoname) 

@@ -365,7 +365,7 @@ def visualize_genes(cd : CountData,
 
 
 def get_eigenpatterns( mat : np.ndarray,
-                       thrs : float = 0.90,
+                       thrs : float = 0.99,
                        normalize : bool = True,
                        )-> np.ndarray :
 
@@ -437,6 +437,7 @@ def visualize_clusters(cd : CountData,
                        times : np.ndarray,
                        ntopgenes : np.ndarray,
                        ncols : int,
+                       threshold : float = 0.8,
                        side_size : float = 3,
                        pltargs : dict = None,
                        normalize : bool = True,
@@ -453,7 +454,7 @@ def visualize_clusters(cd : CountData,
 
     toppatterns = np.argsort(times)[::-1][0:ntopgenes]
     genes = cd.cnt.columns.values[toppatterns]
-    epats = get_eigenpatterns(cd.cnt.values[:,toppatterns])
+    epats = get_eigenpatterns(cd.cnt.values[:,toppatterns],thrs = threshold)
     n_patterns = epats.shape[1]
     
     nrows = np.ceil(n_patterns / ncols).astype(int)
