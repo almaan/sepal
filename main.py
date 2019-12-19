@@ -13,8 +13,6 @@ import matplotlib.pyplot as plt
 
 import utils as ut
 
-
-
 def main():
 
     prs = arp.ArgumentParser()
@@ -58,7 +56,9 @@ def main():
                      type = str,
                      choices = ['visium',
                                 '2k',
-                                '1k'],
+                                '1k',
+                                'seqfish',
+                                ],
                      required = True,
                      help = 'array type')
 
@@ -106,7 +106,11 @@ def main():
                          help = 'threshold in clustering',
                          )
 
-
+    plt_prs.add_argument('-sg','--show_genes',
+                            default = None,
+                            type = int,
+                            help = 'show number of genes',
+                            )
 
     args = prs.parse_args()
 
@@ -114,18 +118,33 @@ def main():
         setup = dict(radius = 1,
                      rotate = None,
                      n_neighbours = 4,
+                     gridify = False,
+                     h = 1,
                      )
 
     elif args.array == '2k':
         setup = dict(radius = np.sqrt(2),
                      rotate = 45,
                      n_neighbours = 4,
+                     gridify = False,
+                     h = 1,
                      )
 
     elif args.array == 'visium':
-        setup = dict(radius = np.sqrt(2),
-                     rotate = 45,
+        setup = dict(radius = 1,
+                     rotate = None,
+                     n_neighbours = 6,
+                     eps = 0.2,
+                     gridify = False,
+                     h  = 1,
+                     coord_rescale = True,
+                     )
+    elif args.array == 'seqfish':
+        setup = dict(radius = 1,
+                     rotate = None,
                      n_neighbours = 4,
+                     gridify = True,
+                     h = 1,
                      )
     else:
         print('array type not supported')
@@ -180,19 +199,22 @@ def main():
                       index = True,
                       )
 
+        if setup['gridify']:
+            cd.ungridify()
+
         if 'plot' in args.modules:
             fig,ax = ut.visualize_genes(cd,
                                         times,
                                         ncols = args.n_cols,
                                         side_size = args.side_size,
-                                        n_genes = args.n_genes,
+                                        n_genes = args.show_genes,
                                         qscale = args.quantile_scaling,
                                         pltargs = args.style_dict,
                                         )
 
             fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
                                                         'top',
-                                                        'diffusion-times.svg']
+                                                        'diffusion-times.png']
                                                        )
                                  )
                         )
@@ -205,11 +227,12 @@ def main():
                                                           args.n_cols,
                                                           threshold = args.threshold,
                                                           pltargs = args.style_dict,
+                                                          show_genes = args.show_genes,
                                                           )
 
                 patoname = osp.join(args.out_dir,'-'.join([sampletag,
                                                           'patterns',
-                                                          'diffusion-times.svg'],
+                                                          'diffusion-times.png'],
                                                         )
                                   )
                                      
@@ -220,7 +243,7 @@ def main():
                     clustoname = osp.join(args.out_dir,'-'.join([sampletag,
                                                                 'cluster',
                                                                  str(cluster),
-                                                                'diffusion-times.svg'],
+                                                                'diffusion-times.png'],
                                                                  )
                                          )
                     

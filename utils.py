@@ -9,11 +9,15 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 from scipy.spatial import KDTree
+from scipy.spatial.distance import cdist
+
 from sklearn.cluster import AgglomerativeClustering as ACl
 
 from typing import Tuple
 
 from tqdm import tqdm
+
+import lap
 
 def print_params(func,*args,**kwargs):
     def wrapper(*args,**kwargs):
@@ -80,12 +84,28 @@ class CountData:
                  cnt : pd.DataFrame,
                  radius : float,
                  n_neighbours : int,
+                 normalize : bool = True, 
                  eps : float = 0.1,
                  rotate : int = None,
+                 gridify : bool = False,
+                 h : np.ndarray = None,
+                 coord_rescale : bool = False,
                  )-> None:
 
         self.cnt = cnt
         self.crd = self.get_crd(cnt.index)
+
+        if normalize:
+            self.normalize()
+
+        if coord_rescale:
+            dists = cdist(self.crd,self.crd)
+            dists[dists == 0] = dists.max()
+            mn = np.min(dists)
+            self.crd = self.crd / mn
+
+        if gridify:
+            self.gridify()
 
         self._update_specs()
 
@@ -104,7 +124,7 @@ class CountData:
         self.r = radius
         self.eps = eps
         self.nn = n_neighbours
-
+        self.h = h * np.ones((self.S,)) 
 
         self.kdt = KDTree(self.crd)
 
@@ -121,6 +141,51 @@ class CountData:
         crd = crd
         
         return crd
+
+    def _to_structured(self,
+                      )->np.ndarray:
+
+        xmin,ymin = np.min(self.crd,axis = 0) 
+        xmax,ymax = np.max(self.crd,axis = 0) 
+
+        npoints = np.ceil(np.sqrt(self.crd.shape[0])).astype(int)
+        xx = np.linspace(xmin,xmax,npoints)
+        yy = np.linspace(ymin,ymax,npoints)
+
+        XX,YY = np.meshgrid(xx,yy)
+        gx = XX.reshape(-1,1)
+        gy = YY.reshape(-1,1)
+        gcrd = np.hstack((gx,gy))
+
+        dmat = cdist(self.crd,
+                     gcrd,
+                     metric = 'euclidean')
+
+        _,cidxs,ridxs = lap.lapjv(dmat,extend_cost = True)
+        ncrd = gcrd[cidxs,:]
+
+        delta_x = np.diff(xx)[0]
+        delta_y = np.diff(yy)[0]
+
+
+        ncrd[:,0] = (ncrd[:,0] - xmin ) / delta_x
+        ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
+
+        h = dmat[np.arange(dmat.shape[0]),cidxs]
+        h = h / h.max()
+        h = h.reshape(-1,)
+
+        return ncrd, h
+
+    def gridify(self,)->None:
+        self.oldcrd = self.crd[:,:]
+        self.crd,self.h = self._to_structured()
+
+
+    def ungridify(self,)->None:
+       self.crd = self.oldcrd[:,:]
+       self.oldcrd = None
+
 
     def _rotate(self,
                 rmat : np.ndarray,
@@ -158,19 +223,23 @@ class CountData:
                 
         self.saturated = np.array(self.saturated).astype(int)
         self.saturated_idx = self.cnt.index[self.saturated]
+
         self._update_specs()
 
     def normalize(self,)-> None:
         vs = self.cnt.values.astype(float)
-        sm = vs.sum(axis = 1)
-        iszero = (sm == 0)
-        if iszero.sum() > 0:
-            vs[sm == 0,:] = np.nan
-            vs = vs / sm.reshape(-1,1)
-            vs[np.isnan(vs)] = 0
-            self.cnt.iloc[:,:] = vs
-        else:
-            self.cnt.iloc[:,:] = vs/sm.reshape(-1,1)
+
+        for shape,along in zip([(-1,1)],[1]):
+            sm =vs.sum(axis=along)
+            iszero = (sm == 0)
+            if iszero.sum() > 0:
+                vs[sm == 0,:] = np.nan
+                vs = vs / sm.reshape(shape)
+                vs[np.isnan(vs)] = 0
+                self.cnt = pd.DataFrame(vs,index =  self.cnt.index,columns = self.cnt.columns)
+            else:
+#                self.cnt.iloc[:,:] = vs/sm.reshape(shape)
+                self.cnt = pd.DataFrame(vs/sm.reshape(shape),index =  self.cnt.index,columns = self.cnt.columns)
 
     def get_allnbr_idx(self,
                        sel : np.ndarray,
@@ -200,34 +269,40 @@ class CountData:
                                 narr[k,3] = nbrs[k][n]
 
             return narr.astype(int)
+
         elif self.nn == 6:
-            eps = 0.2 # 11degs
+            nbrs = self.kdt.query_ball_point(self.crd[sel,:],
+                                             self.r + self.eps)
+            
+            narr = np.nan * np.ones((sel.shape[0],self.nn))
             for k,spot in enumerate(sel):
                 for n in range(0,self.nn+1):
                     if nbrs[k][n] != spot:
-                        nvec =  self.crd[spot,:] - self.crd[nbrs[k][n],:]
+                        nvec =  self.crd[nbrs[k][n],:] - self.crd[spot,:] 
                         nvec = nvec / np.linalg.norm(nvec)
-                        if nvec[0] < 0:
-                            theta = np.arccos(-1*nvec[0])
-                            if np.abs(theta) < eps:
-                                narr[k,1] = nbrs[k][n]
-                            elif theta < np.pi/2 - eps and theta > eps:
-                                narr[k,3] = nbrs[k][n]
-                            else:
-                                narr[k,5] = nbrs[k][n]
-                        else:
-                            theta = np.arccos(nvec[0])
-                            if np.abs(theta) < eps:
-                                narr[k,0] = nbrs[k][n]
-                            elif theta < np.pi/2 - eps and theta > eps:
-                                narr[k,2] = nbrs[k][n]
-                            else:
-                                narr[k,4] = nbrs[k][n]
+                        pos = self._vec2hex(nvec)
+                        narr[k,pos] = nbrs[k][n]
+
             return narr.astype(int)
                         
         else:
             print(f"Not implemented for this type of array")
             return None
+
+    def _vec2hex(self,vec):
+        edges = np.pi / 6 + np.array([n * np.pi / 3 for n in range(6)]) 
+        ordering = np.array([5, 2, 1, 4, 3, 0])
+        edges = edges[ordering]
+        theta = np.arccos(vec[0])
+
+        if vec[1] < 0:
+            theta = 2*np.pi - theta
+
+        pos = np.argmin(np.abs(edges - theta))
+        pos = pos.astype(int)
+
+        return pos
+ 
 
     def get_allnbr_cnt(self,
                       )-> Tuple[np.ndarray,...]:
@@ -272,6 +347,8 @@ def propagate(cd : CountData,
     elif cd.nn == 6:
         laplacian = laplacian_hexagonal
 
+    h = cd.h[cd.saturated]
+
     # Propagate in time
     for gene in iterable:
         conc = ncnt[:,gene].astype(float)
@@ -287,7 +364,7 @@ def propagate(cd : CountData,
                 break
             time +=dt
 
-            d2 = laplacian(conc[cd.saturated],conc[nidx],1)
+            d2 = laplacian(conc[cd.saturated],conc[nidx],h)
             dcdt = D*d2
             conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
             conc[conc < 0] = 0
@@ -341,6 +418,8 @@ def visualize_genes(cd : CountData,
     if pltargs is not None:
         for k,v in pltargs.items():
             _pltargs[k] = v
+            if k == 'cmap' and isinstance(k,str):
+                _pltargs[k] = eval(v)
 
     for ii in range(n_genes):
         vals = ncnt[:,topgenes[ii]].reshape(-1,)
@@ -441,6 +520,7 @@ def visualize_clusters(cd : CountData,
                        side_size : float = 3,
                        pltargs : dict = None,
                        normalize : bool = True,
+                       show_genes : int = None,
                        ):
     
     _pltargs = {'s':40,
@@ -451,6 +531,8 @@ def visualize_clusters(cd : CountData,
     if pltargs is not None:
         for k,v in pltargs.items():
             _pltargs[k] = v
+            if k == 'cmap' and isinstance(k,str):
+                _pltargs[k] = eval(v)
 
     toppatterns = np.argsort(times)[::-1][0:ntopgenes]
     genes = cd.cnt.columns.values[toppatterns]
@@ -490,7 +572,11 @@ def visualize_clusters(cd : CountData,
 
     for k,lab in enumerate(uni_labels):
         pos = np.where(labels == lab)[0]
-        nrows = np.ceil((labels == lab).sum() / ncols).astype(int)
+
+        if show_genes is not None:
+            pos = pos[0:np.min((show_genes,pos.shape[0])).astype(int)]
+
+        nrows = np.ceil(pos.shape[0] / ncols).astype(int)
 
         figsize = (1.2 * ncols * side_size,
                    1.2 * nrows * side_size)
@@ -503,7 +589,7 @@ def visualize_clusters(cd : CountData,
 
         vizlist[-1][1] = vizlist[-1][1].flatten()
 
-        for ii in range((labels == lab).sum()):
+        for ii in range(pos.shape[0]):
             vizlist[-1][1][ii].set_title("Gene : {}".format(genes[pos[ii]]))
             vizlist[-1][1][ii].scatter(cd.crd[:,0],
                                        cd.crd[:,1],
@@ -521,16 +607,38 @@ def visualize_clusters(cd : CountData,
     return (eigviz,vizlist)
 
 
+def to_structured(crd : np.ndarray)->np.ndarray:
 
+    xmin,ymin = np.min(crd,axis = 0) 
+    xmax,ymax = np.max(crd,axis = 0) 
 
+    npoints = np.ceil(np.sqrt(crd.shape[0])).astype(int)
+    xx = np.linspace(xmin,xmax,18)
+    yy = np.linspace(ymin,ymax,18)
 
+    XX,YY = np.meshgrid(xx,yy)
+    gx = XX.reshape(-1,1)
+    gy = YY.reshape(-1,1)
+    gcrd = np.hstack((gx,gy))
 
+    dmat = cdist(crd,
+                 gcrd,
+                 metric = 'euclidean')
 
+    row_idxs,col_idxs = lpa(dmat)
+    ncrd = gcrd[col_idxs,:]
 
+    return ncrd
 
+def change_crd_index(df : pd.Index,
+                     new_crd : np.ndarray) -> pd.Index :
 
+    new_idx = [ 'x'.join(crd[x,:].astype(str)) for\
+                x in range(crd.shape[0])]
 
+    new_idx = pd.Index(new_idx)
 
+    old_idx  = df.index
+    df.index = new_idx
 
-
-
+    return (df,old_idx) 
