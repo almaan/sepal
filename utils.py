@@ -4,6 +4,10 @@ from enum import Enum
 from copy import deepcopy
 import re
 
+
+import datetime
+import re
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -278,9 +282,7 @@ class CountData:
             for k,spot in enumerate(sel):
                 for n in range(0,self.nn+1):
                     if nbrs[k][n] != spot:
-                        nvec =  self.crd[nbrs[k][n],:] - self.crd[spot,:] 
-                        nvec = nvec / np.linalg.norm(nvec)
-                        pos = self._vec2hex(nvec)
+                        pos = self._getpos(spot,nbrs[k][n])
                         narr[k,pos] = nbrs[k][n]
 
             return narr.astype(int)
@@ -289,7 +291,12 @@ class CountData:
             print(f"Not implemented for this type of array")
             return None
 
-    def _vec2hex(self,vec):
+    def _getpos(self,
+                 origin_idx,
+                 nbr_idx):
+
+        vec =  self.crd[nbr_idx,:] - self.crd[origin_idx,:] 
+        vec = vec / np.linalg.norm(vec)
         edges = np.pi / 6 + np.array([n * np.pi / 3 for n in range(6)]) 
         ordering = np.array([5, 2, 1, 4, 3, 0])
         edges = edges[ordering]
@@ -382,7 +389,8 @@ def clean_axes(ax : plt.Axes,
         for pos in ax.spines.keys():
             ax.spines[pos].set_visible(False)
 
-def visualize_genes(cd : CountData,
+def visualize_genes(cnt : CountData,
+                    crd : np.ndarray,
                     times : np.ndarray,
                     n_genes : int = 20,
                     ncols : int = 5,
@@ -394,10 +402,10 @@ def visualize_genes(cd : CountData,
 
 
     if normalize:
-        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
-        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+        rowsums = np.sum(cnt.values,axis = 1).reshape(-1,1)
+        ncnt = np.divide(cnt.values,rowsums,where = rowsums > 0)
     else:
-        ncnt = cd.cnt.values
+        ncnt = cnt.values
 
     topgenes = np.argsort(times)[::-1][0:n_genes]
     nrows = np.ceil(n_genes / ncols).astype(int)
@@ -431,10 +439,10 @@ def visualize_genes(cd : CountData,
                 print('WARNING : {} is not a proper quantile value'.format(qscale),
                       'within range (0,1)')
 
-        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cd.cnt.columns[topgenes[ii]],
+        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cnt.columns[topgenes[ii]],
                                                              times[topgenes[ii]]))
-        ax[ii].scatter(cd.crd[:,0],
-                       cd.crd[:,1],
+        ax[ii].scatter(crd[:,0],
+                       crd[:,1],
                        c = vals,
                        **_pltargs,
                       )
@@ -607,29 +615,6 @@ def visualize_clusters(cd : CountData,
     return (eigviz,vizlist)
 
 
-def to_structured(crd : np.ndarray)->np.ndarray:
-
-    xmin,ymin = np.min(crd,axis = 0) 
-    xmax,ymax = np.max(crd,axis = 0) 
-
-    npoints = np.ceil(np.sqrt(crd.shape[0])).astype(int)
-    xx = np.linspace(xmin,xmax,18)
-    yy = np.linspace(ymin,ymax,18)
-
-    XX,YY = np.meshgrid(xx,yy)
-    gx = XX.reshape(-1,1)
-    gy = YY.reshape(-1,1)
-    gcrd = np.hstack((gx,gy))
-
-    dmat = cdist(crd,
-                 gcrd,
-                 metric = 'euclidean')
-
-    row_idxs,col_idxs = lpa(dmat)
-    ncrd = gcrd[col_idxs,:]
-
-    return ncrd
-
 def change_crd_index(df : pd.Index,
                      new_crd : np.ndarray) -> pd.Index :
 
@@ -642,3 +627,7 @@ def change_crd_index(df : pd.Index,
     df.index = new_idx
 
     return (df,old_idx) 
+
+def timestamp() -> str:
+    return re.sub(':|-|\.| |','',str(datetime.datetime.now()))
+

@@ -114,6 +114,13 @@ def main():
 
     args = prs.parse_args()
 
+    analysistag = ut.timestamp()
+
+    print("[INFO] : will analyze samples: ")
+    for k,s in enumerate(args.count_files):
+        print("\t [{}] : {}".format(k + 1,s))
+
+
     if args.array == '1k':
         setup = dict(radius = 1,
                      rotate = None,
@@ -144,16 +151,19 @@ def main():
                      rotate = None,
                      n_neighbours = 4,
                      gridify = True,
+                     coord_rescale = True,
                      h = 1,
                      )
     else:
         print('array type not supported')
         sys.exit(-1)
 
-
-
+    times_all = []
+    data_list = []
+    sampletags = []
     for sample,cpth in enumerate(args.count_files):
-        sampletag = '.'.join(osp.basename(cpth).split('.')[0:-1])
+
+        sampletags.append('.'.join(osp.basename(cpth).split('.')[0:-1]))
         cnt = ut.read_file(cpth)
         if args.transpose:
             cnt = cnt.T
@@ -169,7 +179,9 @@ def main():
 
         n_spots,n_genes = cnt.shape
 
-        print("GENES : {} | SPOTS : {}".format(n_genes,n_spots))
+        print("SAMPLE {} | GENES : {} | SPOTS : {}".format(sample + 1,
+                                                           n_genes,
+                                                           n_spots))
 
         cd = ut.CountData(cnt,
                           **setup, 
@@ -178,33 +190,47 @@ def main():
         np.random.seed(1337)
         times = ut.propagate(cd)
 
-        out_df = pd.DataFrame([str(x) for x in times],
+
+        times_df = pd.DataFrame([str(x) for x in times],
                               index = cd.cnt.columns,
-                              columns = ['diff-time'],
+                              columns = [sampletags[-1]],
                               )
 
-        if not osp.exists(args.out_dir):
-            os.mkdir(args.out_dir)
-
-        
-        out_df_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
-                                                                  'top',
-                                                                  'diffusion-times.tsv']
-                                                                 )
-                              )
-
-        out_df.to_csv(out_df_pth,
-                      sep = '\t',
-                      header = True,
-                      index = True,
-                      )
+        times_all.append(times_df)
 
         if setup['gridify']:
             cd.ungridify()
 
-        if 'plot' in args.modules:
-            fig,ax = ut.visualize_genes(cd,
-                                        times,
+        data_list.append(cd)
+
+    
+    times_all = pd.concat(times_all, axis = 1, join = 'inner').astype(float)
+    
+    mn = times_all.values.min(axis = 0).reshape(1,-1)
+    mx = times_all.values.max(axis = 0).reshape(1,-1)
+
+    times_all['average'] = ((times_all.values - mn) / (mx - mn)).mean(axis = 1)
+
+    if not osp.exists(args.out_dir):
+        os.mkdir(args.out_dir)
+
+    out_df_pth = osp.join(args.out_dir,args.out_dir,'-'.join([analysistag,
+                                                            'top',
+                                                            'diffusion-times.tsv']
+                                                            )
+                        )
+
+    times_all.to_csv(out_df_pth,
+                     sep = '\t',
+                     header = True,
+                     index = True,
+                     )
+
+    if args.modules is not None and 'plot' in args.modules:
+        for cd,sampletag in zip(data_list,sampletags):
+            fig,ax = ut.visualize_genes(cd.cnt.loc[:,times_all.index],
+                                        cd.crd,
+                                        times_all['average'].values,
                                         ncols = args.n_cols,
                                         side_size = args.side_size,
                                         n_genes = args.show_genes,
@@ -215,39 +241,39 @@ def main():
             fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
                                                         'top',
                                                         'diffusion-times.png']
-                                                       )
-                                 )
+                                                        )
+                                    )
                         )
 
-            if args.cluster:
-                args.threshold = np.clip(args.threshold,0,1)
-                eigviz, clusterviz = ut.visualize_clusters(cd,
-                                                          times,
-                                                          args.n_genes,
-                                                          args.n_cols,
-                                                          threshold = args.threshold,
-                                                          pltargs = args.style_dict,
-                                                          show_genes = args.show_genes,
-                                                          )
+        if args.cluster:
+            args.threshold = np.clip(args.threshold,0,1)
+            eigviz, clusterviz = ut.visualize_clusters(cd.loc[:,times_all.index],
+                                                       times['average'].values,
+                                                       args.n_genes,
+                                                       args.n_cols,
+                                                       threshold = args.threshold,
+                                                       pltargs = args.style_dict,
+                                                       show_genes = args.show_genes,
+                                                       )
 
-                patoname = osp.join(args.out_dir,'-'.join([sampletag,
-                                                          'patterns',
-                                                          'diffusion-times.png'],
-                                                        )
-                                  )
-                                     
+            patoname = osp.join(args.out_dir,'-'.join([sampletag,
+                                                        'patterns',
+                                                        'diffusion-times.png'],
+                                                    )
+                                )
 
-                eigviz[0].savefig(patoname) 
 
-                for cluster in range(len(clusterviz)):
-                    clustoname = osp.join(args.out_dir,'-'.join([sampletag,
-                                                                'cluster',
-                                                                 str(cluster),
-                                                                'diffusion-times.png'],
-                                                                 )
-                                         )
-                    
-                    clusterviz[cluster][0].savefig(clustoname) 
+            eigviz[0].savefig(patoname) 
+
+            for cluster in range(len(clusterviz)):
+                clustoname = osp.join(args.out_dir,'-'.join([sampletag,
+                                                            'cluster',
+                                                                str(cluster),
+                                                            'diffusion-times.png'],
+                                                                )
+                                        )
+
+                clusterviz[cluster][0].savefig(clustoname) 
 
 
 if __name__ == '__main__':
