@@ -7,6 +7,7 @@ import re
 
 import datetime
 import re
+import sys
 
 import numpy as np
 import pandas as pd
@@ -43,35 +44,6 @@ def read_file(pth : str,
                      )
     return df
 
-def laplacian_rectilinear(centers : np.ndarray,
-              nbrs : np.ndarray,
-              h : float,
-              )-> np.ndarray:
-
-    d2f = nbrs.sum(axis = 1) - 4*centers
-    d2f = d2f / h**2
-
-    return d2f
-
-def laplacian_hexagonal(centers : np.ndarray,
-                        nbrs : np.ndarray,
-                        h : float,
-                        )-> np.ndarray:
-
-    d2f = nbrs.sum(axis = 1) - 6*centers
-    d2f = d2f / h**2 * 2 / 3
-
-    return d2f
-
-def divergence_rectilinear(nbrs : np.ndarray,
-                           h : float,
-                           ) -> np.ndarray:
-
-    p1 = nbrs[:,1] - nbrs[:,0] / (2*h)
-    p2 = nbrs[:,3] - nbrs[:,2] / (2*h)
-
-    return p1 + p2
-
 def filter_genes(mat,
                  min_occur : int = 5,
                  min_expr : int = 0,
@@ -82,241 +54,6 @@ def filter_genes(mat,
     keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) for x in mat.columns]).astype(int)
     mat = mat.iloc[:,keep_genes.astype(bool)]
     return mat
-
-class CountData:
-    def __init__(self,
-                 cnt : pd.DataFrame,
-                 radius : float,
-                 n_neighbours : int,
-                 normalize : bool = True, 
-                 eps : float = 0.1,
-                 rotate : int = None,
-                 gridify : bool = False,
-                 h : np.ndarray = None,
-                 coord_rescale : bool = False,
-                 )-> None:
-
-        self.cnt = cnt
-        self.crd = self.get_crd(cnt.index)
-
-        if normalize:
-            self.normalize()
-
-        if coord_rescale:
-            dists = cdist(self.crd,self.crd)
-            dists[dists == 0] = dists.max()
-            mn = np.min(dists)
-            self.crd = self.crd / mn
-
-        if gridify:
-            self.gridify()
-
-        self._update_specs()
-
-
-        if rotate is not None:
-            self.theta = np.deg2rad(rotate)
-            self.rmat = np.array([[np.cos(self.theta),np.sin(self.theta)],
-                                  [-np.sin(self.theta),np.cos(self.theta)]]).T
-            self._rotate(self.rmat)
-
-        else:
-            self.rmat = np.eye(2)
-            self.theta = 0
-
-    
-        self.r = radius
-        self.eps = eps
-        self.nn = n_neighbours
-        self.h = h * np.ones((self.S,)) 
-
-        self.kdt = KDTree(self.crd)
-
-        self._remove_unsaturated()
-
-    def get_crd(self,
-                idx : pd.Index,
-                )->np.ndarray:
-
-        crd = np.array([[float(x) for \
-                         x in y.split('x') ] for\
-                        y in idx])
-
-        crd = crd
-        
-        return crd
-
-    def _to_structured(self,
-                      )->np.ndarray:
-
-        xmin,ymin = np.min(self.crd,axis = 0) 
-        xmax,ymax = np.max(self.crd,axis = 0) 
-
-        npoints = np.ceil(np.sqrt(self.crd.shape[0])).astype(int)
-        xx = np.linspace(xmin,xmax,npoints)
-        yy = np.linspace(ymin,ymax,npoints)
-
-        XX,YY = np.meshgrid(xx,yy)
-        gx = XX.reshape(-1,1)
-        gy = YY.reshape(-1,1)
-        gcrd = np.hstack((gx,gy))
-
-        dmat = cdist(self.crd,
-                     gcrd,
-                     metric = 'euclidean')
-
-        _,cidxs,ridxs = lap.lapjv(dmat,extend_cost = True)
-        ncrd = gcrd[cidxs,:]
-
-        delta_x = np.diff(xx)[0]
-        delta_y = np.diff(yy)[0]
-
-
-        ncrd[:,0] = (ncrd[:,0] - xmin ) / delta_x
-        ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
-
-        h = dmat[np.arange(dmat.shape[0]),cidxs]
-        h = h / h.max()
-        h = h.reshape(-1,)
-
-        return ncrd, h
-
-    def gridify(self,)->None:
-        self.oldcrd = self.crd[:,:]
-        self.crd,self.h = self._to_structured()
-
-
-    def ungridify(self,)->None:
-       self.crd = self.oldcrd[:,:]
-       self.oldcrd = None
-
-
-    def _rotate(self,
-                rmat : np.ndarray,
-                )->None:
-
-        self.crd = np.dot(rmat,self.crd.T).T
-        self.crd = self.crd
-        newidx = pd.Index(['x'.join([str(self.crd[s,0]),
-                                     str(self.crd[s,1])]) for \
-                           s in range(self.S)])
-
-        self.cnt.index = newidx
-
-    def _derotate(self,):
-        self._rotate(np.linalg.inv(rmat))
- 
-    def _update_specs(self,):
- 
-         self.S = self.cnt.shape[0]
-         self.G = self.cnt.shape[1]
-
-    def _remove_unsaturated(self,
-                            )-> None:
-
-        self.saturated = []
-        self.unsaturated = []
-        for spot in range(self.S):
-            nbr = self.kdt.query_ball_point(self.crd[spot,:],
-                                            self.r + self.eps)
-
-            if len(nbr) >= self.nn + 1:
-                self.saturated.append(spot)
-            else:
-                self.unsaturated.append(spot)
-                
-        self.saturated = np.array(self.saturated).astype(int)
-        self.saturated_idx = self.cnt.index[self.saturated]
-
-        self._update_specs()
-
-    def normalize(self,)-> None:
-        vs = self.cnt.values.astype(float)
-
-        for shape,along in zip([(-1,1)],[1]):
-            sm =vs.sum(axis=along)
-            iszero = (sm == 0)
-            if iszero.sum() > 0:
-                vs[sm == 0,:] = np.nan
-                vs = vs / sm.reshape(shape)
-                vs[np.isnan(vs)] = 0
-                self.cnt = pd.DataFrame(vs,index =  self.cnt.index,columns = self.cnt.columns)
-            else:
-#                self.cnt.iloc[:,:] = vs/sm.reshape(shape)
-                self.cnt = pd.DataFrame(vs/sm.reshape(shape),index =  self.cnt.index,columns = self.cnt.columns)
-
-    def get_allnbr_idx(self,
-                       sel : np.ndarray,
-                        ) -> np.ndarray:
-
-        if self.nn == 4:
-            nbrs = self.kdt.query_ball_point(self.crd[sel,:],
-                                             self.r + self.eps)
-
-            narr = np.nan * np.ones((sel.shape[0],self.nn))
-            
-            for k,spot in enumerate(sel):
-                for n in range(0,self.nn+1):
-                    if nbrs[k][n] != spot:
-                        xdiff = np.abs(self.crd[nbrs[k][n],0] - self.crd[spot,0])
-                        ydiff = np.abs(self.crd[nbrs[k][n],1] - self.crd[spot,1])
-                        if xdiff > ydiff:
-                            if self.crd[nbrs[k][n],0] < self.crd[spot,0]:
-                                narr[k,0] = nbrs[k][n]
-                            else:
-                                narr[k,1] = nbrs[k][n]
-                                
-                        else:
-                            if self.crd[nbrs[k][n],1] < self.crd[spot,1]:
-                                narr[k,2] = nbrs[k][n]
-                            else:
-                                narr[k,3] = nbrs[k][n]
-
-            return narr.astype(int)
-
-        elif self.nn == 6:
-            nbrs = self.kdt.query_ball_point(self.crd[sel,:],
-                                             self.r + self.eps)
-            
-            narr = np.nan * np.ones((sel.shape[0],self.nn))
-            for k,spot in enumerate(sel):
-                for n in range(0,self.nn+1):
-                    if nbrs[k][n] != spot:
-                        pos = self._getpos(spot,nbrs[k][n])
-                        narr[k,pos] = nbrs[k][n]
-
-            return narr.astype(int)
-                        
-        else:
-            print(f"Not implemented for this type of array")
-            return None
-
-    def _getpos(self,
-                 origin_idx,
-                 nbr_idx):
-
-        vec =  self.crd[nbr_idx,:] - self.crd[origin_idx,:] 
-        vec = vec / np.linalg.norm(vec)
-        edges = np.pi / 6 + np.array([n * np.pi / 3 for n in range(6)]) 
-        ordering = np.array([5, 2, 1, 4, 3, 0])
-        edges = edges[ordering]
-        theta = np.arccos(vec[0])
-
-        if vec[1] < 0:
-            theta = 2*np.pi - theta
-
-        pos = np.argmin(np.abs(edges - theta))
-        pos = pos.astype(int)
-
-        return pos
- 
-
-    def get_allnbr_cnt(self,
-                      )-> Tuple[np.ndarray,...]:
-
-        idxs = self.get_allnbr_idx(self.saturated)
-
-        return (self.cnt.values[self.saturated,:],self.cnt.values[idxs,:])
 
 def propagate(cd : CountData,
               thrs : float = 10e-10,
@@ -331,7 +68,12 @@ def propagate(cd : CountData,
     n_genes =  cd.G 
     times = np.zeros(n_genes)
     n_saturated = cd.saturated.shape[0]
-    print("{} Saturated Spots".format(n_saturated))
+
+    if n_saturated < 1:
+        print("[ERROR] : No Saturated spots")
+        sys.exit(-1)
+    else:
+        print("[INFO] : {} Saturated Spots".format(n_saturated))
 
     if normalize:
         rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
@@ -349,20 +91,14 @@ def propagate(cd : CountData,
     # Get neighbour indices
     nidx = cd.get_allnbr_idx(cd.saturated)
 
-    if cd.nn == 4:
-        laplacian = laplacian_rectilinear
-    elif cd.nn == 6:
-        laplacian = laplacian_hexagonal
-
-    h = cd.h[cd.saturated]
-
     # Propagate in time
     for gene in iterable:
+
         conc = ncnt[:,gene].astype(float)
-        q_95 = np.quantile(conc,0.95)
+        q_95 = np.quantile(conc,0.95,interpolation = 'nearest')
         conc[conc > q_95] = q_95
-#        conc[cd.unsaturated] = 0
         maxDelta = np.inf
+
         time = 0
         while maxDelta > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
@@ -371,9 +107,12 @@ def propagate(cd : CountData,
                 break
             time +=dt
 
-            d2 = laplacian(conc[cd.saturated],conc[nidx],h)
+            d2 = cd.laplacian(conc[cd.saturated],
+                              conc[nidx],
+                              cd.h[cd.saturated])
             dcdt = D*d2
             conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
+
             conc[conc < 0] = 0
             times[gene] = time
             maxDelta = np.max(np.abs(dcdt*dt)) / dcdt.shape[0]

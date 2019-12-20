@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 
-from abc import ABC
+import numpy as np
+import pandas as pd
+
+from abc import ABC,abstractmethod
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
+import lap
+
+import matplotlib.pyplot as plt
 
 from typing import Tuple
-
 
 class CountData(ABC):
     def __init__(self,
@@ -15,18 +20,27 @@ class CountData(ABC):
                  )-> None:
 
 
-        self._update_specs()
         self.cnt = cnt
         self.crd = self.get_crd(cnt.index)
         self.real_crd = self.get_crd(cnt.index)
 
-        self.nn = None
+        self._format_crd()
+        self._update_specs()
 
         self.r = 1
         self.eps = eps
         self.h = self.r * np.ones(self.S,) 
         
         self._set_edges()
+
+        self.kdt = KDTree(self.crd)
+        self._remove_unsaturated()
+
+    def _update_specs(self,
+                      )->None:
+
+        self.S = self.cnt.shape[0]
+        self.G = self.cnt.shape[1]
 
     def get_crd(self,
                 idx : pd.Index,
@@ -35,14 +49,16 @@ class CountData(ABC):
         crd = np.array([[float(x) for \
                         x in y.split('x') ] for\
                         y in idx])
-
-        dists = cdist(self.crd,self.crd)
-        dists[dists == 0] = dists.max()
-        mn = np.min(dists)
-        self.crd = self.crd / mn
-        
+       
         return crd
 
+    def _scale_crd(self,
+                   )->None:
+
+        dists = cdist(self.crd,self.crd)
+        dists[dists == 0] = np.inf 
+        mn =  dists.min() 
+        self.crd = self.crd / mn
 
     def normalize(self,
                   )-> None:
@@ -61,7 +77,6 @@ class CountData(ABC):
                                 index =  self.cnt.index,
                                 columns = self.cnt.columns)
 
-
     def _remove_unsaturated(self,
                             )-> None:
 
@@ -69,8 +84,8 @@ class CountData(ABC):
         self.unsaturated = []
         for spot in range(self.S):
             nbr = self.kdt.query_ball_point(self.crd[spot,:],
-                                            self.r + self.eps)
-
+                                            self.r + self.eps,
+                                            )
             if len(nbr) >= self.nn + 1:
                 self.saturated.append(spot)
             else:
@@ -90,8 +105,9 @@ class CountData(ABC):
 
         for k,spot in enumerate(sel):
             for n in range(0,self.nn+1):
-                pos = self._getpos(spot,nbrs[k][n])
-                narr[k,pos] = nbrs[k][n]
+                    if nbrs[k][n] != spot:
+                        pos = self._getpos(spot,nbrs[k][n])
+                        narr[k,pos] = nbrs[k][n]
 
         return narr.astype(int)
 
@@ -126,6 +142,11 @@ class CountData(ABC):
     def _set_edges(self,
                    ) -> None:
         pass
+    
+    @abstractmethod
+    def _format_crd(self,
+                   ) -> None:
+        pass
 
     @abstractmethod
     def laplacian(self,
@@ -133,7 +154,7 @@ class CountData(ABC):
                   nbrs : np.ndarray,
                   h : np.ndarray,
                   )-> np.ndarray:
-
+        pass
 
 class ST1K(CountData):
     def __init__(self,
@@ -142,12 +163,19 @@ class ST1K(CountData):
                  eps : float = 0.1,
                  )-> None:
 
-        super().__init__(*args,**kwargs)
         self.nn = 4
+        super().__init__(cnt,normalize,eps)
+
+    def _format_crd(self,
+                )->None:
+
+        self._scale_crd()
 
     def _set_edges(self,
                    )->None:
-        self.edges = np.array([np.pi / 2 * n for n in range(4)])
+
+        self.edges = np.array([np.pi / 2 * n for \
+                               n in range(4)])
 
     def laplacian(self,
                   centers : np.ndarray,
@@ -160,14 +188,19 @@ class ST1K(CountData):
 
 
 class VisiumData(CountData):
+
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 
                  eps : float = 0.1,
                  )-> None:
 
-        super().__init__(*args,**kwargs)
         self.nn = 6
+        super().__init__(cnt,normalize,eps)
+
+    def _format_crd(self,
+                    )->None:
+        self._scale_crd()
 
     def _set_edges(self,
                    )->None:
@@ -183,23 +216,33 @@ class VisiumData(CountData):
                     h : np.ndarray,
                     )-> np.ndarray:
 
-                return laplacian_hex(centers,nbrs,h)
+        return laplacian_hex(centers,nbrs,h)
 
 class ST2K(CountData):
+
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 
                  eps : float = 0.1,
                  )-> None:
-        super().__init__(*args,**kwargs)
-        self.nn = 4
 
+        self.nn = 4
+        super().__init__(cnt,normalize,eps)
+
+    def _format_crd(self,
+                )->None:
+
+        self._scale_crd()
 
     def _set_edges(self,
                    )->None:
 
         self.edges = np.pi / 4 + \
             np.array([np.pi / 2 * n for n in range(4)])
+        
+        order = np.array([0,2,1,3])
+        self.edges = self.edges[order]
+
 
     def laplacian(self,
                   centers : np.ndarray,
@@ -218,9 +261,16 @@ class UnstructuredData(CountData):
                  eps : float = 0.1,
                  )-> None:
 
-        super().__init__(*args,**kwargs)
         self.nn = 4
-        self.crd, self.h = self._to_structured
+        super().__init__(cnt,
+                         normalize,
+                         eps)
+
+    def _format_crd(self,
+                )->None:
+
+        self._to_structured()
+        self._scale_crd()
 
     def _set_edges(self,
                    )->None:
@@ -233,7 +283,9 @@ class UnstructuredData(CountData):
             xmin,ymin = np.min(self.crd,axis = 0) 
             xmax,ymax = np.max(self.crd,axis = 0) 
 
-            npoints = np.ceil(np.sqrt(self.crd.shape[0])).astype(int)
+            npoints = np.ceil(np.sqrt(self.crd.shape[0]))
+            npoints = npoints.astype(int) 
+            
             xx = np.linspace(xmin,xmax,npoints)
             yy = np.linspace(ymin,ymax,npoints)
 
@@ -243,10 +295,10 @@ class UnstructuredData(CountData):
             gcrd = np.hstack((gx,gy))
 
             dmat = cdist(self.crd,
-                        gcrd,
-                        metric = 'euclidean')
+                         gcrd,
+                         metric = 'euclidean')
 
-            _,cidxs,ridxs = lap.lapjv(np.exp(dmat),
+            _,cidxs,ridxs = lap.lapjv(np.exp(dmat / dmat.max()),
                                       extend_cost = True)
             ncrd = gcrd[cidxs,:]
 
@@ -258,25 +310,20 @@ class UnstructuredData(CountData):
             ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
 
             h = dmat[np.arange(dmat.shape[0]),cidxs]
+            print(h)
             h = h / h.max()
             h = h.reshape(-1,)
 
-            return ncrd, h
+            self.crd = ncrd
+            self.h = h
 
-        def gridify(self,)->None:
-            self.oldcrd = self.crd[:,:]
-            self.crd,self.h = self._to_structured()
+    def laplacian(self,
+                centers : np.ndarray,
+                nbrs : np.ndarray,
+                h : np.ndarray,
+                )-> np.ndarray:
 
-        def laplacian(self,
-                  centers : np.ndarray,
-                  nbrs : np.ndarray,
-                  h : np.ndarray,
-                  )-> np.ndarray:
-
-            return laplacian_rect(centers,nbrs,h)
-
-
-
+        return laplacian_rect(centers,nbrs,h)
 
 def laplacian_rect(centers : np.ndarray,
                    nbrs : np.ndarray,
@@ -297,10 +344,6 @@ def laplacian_hex(centers : np.ndarray,
     d2f = d2f / h**2 * 2 / 3
 
     return d2f
-
-
-
-
 
 
 

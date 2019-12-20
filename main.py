@@ -12,6 +12,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 import utils as ut
+import models as m
 
 def main():
 
@@ -120,43 +121,11 @@ def main():
     for k,s in enumerate(args.count_files):
         print("\t [{}] : {}".format(k + 1,s))
 
-
-    if args.array == '1k':
-        setup = dict(radius = 1,
-                     rotate = None,
-                     n_neighbours = 4,
-                     gridify = False,
-                     h = 1,
-                     )
-
-    elif args.array == '2k':
-        setup = dict(radius = np.sqrt(2),
-                     rotate = 45,
-                     n_neighbours = 4,
-                     gridify = False,
-                     h = 1,
-                     )
-
-    elif args.array == 'visium':
-        setup = dict(radius = 1,
-                     rotate = None,
-                     n_neighbours = 6,
-                     eps = 0.2,
-                     gridify = False,
-                     h  = 1,
-                     coord_rescale = True,
-                     )
-    elif args.array == 'seqfish':
-        setup = dict(radius = 1,
-                     rotate = None,
-                     n_neighbours = 4,
-                     gridify = True,
-                     coord_rescale = True,
-                     h = 1,
-                     )
-    else:
-        print('array type not supported')
-        sys.exit(-1)
+    Data = {"1k": m.ST1K,
+            "2k": m.ST2K,
+            "visium" : m.VisiumData,
+            "seqfish": m.UnstructuredData,
+            }
 
     times_all = []
     data_list = []
@@ -183,9 +152,7 @@ def main():
                                                            n_genes,
                                                            n_spots))
 
-        cd = ut.CountData(cnt,
-                          **setup, 
-                          )
+        cd = Data[args.array](cnt,eps = 0.2)
 
         np.random.seed(1337)
         times = ut.propagate(cd)
@@ -197,9 +164,6 @@ def main():
                               )
 
         times_all.append(times_df)
-
-        if setup['gridify']:
-            cd.ungridify()
 
         data_list.append(cd)
 
@@ -229,7 +193,7 @@ def main():
     if args.modules is not None and 'plot' in args.modules:
         for cd,sampletag in zip(data_list,sampletags):
             fig,ax = ut.visualize_genes(cd.cnt.loc[:,times_all.index],
-                                        cd.crd,
+                                        cd.real_crd,
                                         times_all['average'].values,
                                         ncols = args.n_cols,
                                         side_size = args.side_size,
