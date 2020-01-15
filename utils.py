@@ -24,6 +24,8 @@ from tqdm import tqdm
 
 import lap
 
+import models as m
+
 def print_params(func,*args,**kwargs):
     def wrapper(*args,**kwargs):
         print("Function : {} | Parameters : {} {} ".format(func.__name__,
@@ -55,9 +57,9 @@ def filter_genes(mat,
     mat = mat.iloc[:,keep_genes.astype(bool)]
     return mat
 
-def propagate(cd : CountData,
-              thrs : float = 10e-10,
-              dt : float = 0.01,
+def propagate(cd : m.CountData,
+              thrs : float = 1e-4,
+              dt : float = 0.1,
               stopafter : int = 10e10,
               normalize : bool = True,
               diffusion_rate : int = 1,
@@ -76,8 +78,9 @@ def propagate(cd : CountData,
         print("[INFO] : {} Saturated Spots".format(n_saturated))
 
     if normalize:
-        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
-        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+
+        colMax = np.max(cd.cnt.values,axis = 0).reshape(1,-1)
+        ncnt = np.divide(cd.cnt.values,colMax,where = colMax > 0)
     else:
         ncnt = cd.cnt.values
 
@@ -93,18 +96,15 @@ def propagate(cd : CountData,
 
     # Propagate in time
     for gene in iterable:
-
         conc = ncnt[:,gene].astype(float)
-        q_95 = np.quantile(conc,0.95,interpolation = 'nearest')
-        conc[conc > q_95] = q_95
         maxDelta = np.inf
-
-        time = 0
+        time  = 0
         while maxDelta > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
                 print("WARNING : Gene : {} did not convege".format(genename))
                 break
+
             time +=dt
 
             d2 = cd.laplacian(conc[cd.saturated],
@@ -115,7 +115,8 @@ def propagate(cd : CountData,
 
             conc[conc < 0] = 0
             times[gene] = time
-            maxDelta = np.max(np.abs(dcdt*dt)) / dcdt.shape[0]
+
+            maxDelta = np.max(np.abs(dcdt))
 
     return times
 
@@ -128,7 +129,7 @@ def clean_axes(ax : plt.Axes,
         for pos in ax.spines.keys():
             ax.spines[pos].set_visible(False)
 
-def visualize_genes(cnt : CountData,
+def visualize_genes(cnt : m.CountData,
                     crd : np.ndarray,
                     times : np.ndarray,
                     n_genes : int = 20,
@@ -259,7 +260,7 @@ def cluster_patterns(dmat : np.ndarray,
 
     return cidx
 
-def visualize_clusters(cd : CountData,
+def visualize_clusters(cd : m.CountData,
                        times : np.ndarray,
                        ntopgenes : np.ndarray,
                        ncols : int,

@@ -114,7 +114,7 @@ def make_count_matrix(img_files : list,
             for mult in mult_factors:
                 gmat[:,next(g_iter)] = (np.random.permutation(gene_vals) * mult).round()
                 gene_names.append("P" + str( num ) + \
-                                  "-F" + "-T" + str( mult ))
+                                  "-F" + str(friend) + "-T" + str( mult ))
 
 
     spot_names = [str( xx ) + 'x' + \

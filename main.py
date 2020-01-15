@@ -152,7 +152,7 @@ def main():
                                                            n_genes,
                                                            n_spots))
 
-        cd = Data[args.array](cnt,eps = 0.2)
+        cd = Data[args.array](cnt,eps = 0.2,normalize = False)
 
         np.random.seed(1337)
         times = ut.propagate(cd)
@@ -211,8 +211,8 @@ def main():
 
         if args.cluster:
             args.threshold = np.clip(args.threshold,0,1)
-            eigviz, clusterviz = ut.visualize_clusters(cd.loc[:,times_all.index],
-                                                       times['average'].values,
+            eigviz, clusterviz = ut.visualize_clusters(cd,
+                                                       times_all['average'].values,
                                                        args.n_genes,
                                                        args.n_cols,
                                                        threshold = args.threshold,
