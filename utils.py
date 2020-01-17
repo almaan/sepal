@@ -17,6 +17,7 @@ from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 
 from sklearn.cluster import AgglomerativeClustering as ACl
+from sklearn.cluster import SpectralClustering as SpCl
 
 from typing import Tuple
 
@@ -79,7 +80,7 @@ def propagate(cd : m.CountData,
         num_workers = min(num_workers,
                           cpu_count())
 
-    print("[INFO] : Using {} workers".format(n_workers))
+    print("[INFO] : Using {} workers".format(num_workers))
 
     diff_prop = {'D':diffusion_rate,
                  'thrs':thrs,
@@ -94,10 +95,13 @@ def propagate(cd : m.CountData,
         print("[INFO] : {} Saturated Spots".format(n_saturated))
 
     if normalize:
-        rowMean = np.mean(cd.cnt.values,axis = 1).reshape(-1,1)
-        ncnt = np.divide(cd.cnt.values,rowMean,where = rowMean > 0)
+        rowMean = np.mean(cd.cnt.values,
+                          axis = 1).reshape(-1,1)
+        ncnt = np.divide(cd.cnt.values,
+                         rowMean,where = rowMean > 0)
         colMax = np.max(ncnt,axis = 0).reshape(1,-1)
-        ncnt = np.divide(cd.cnt.values,colMax,where = colMax > 0)
+        ncnt = np.divide(cd.cnt.values,
+                         colMax,where = colMax > 0)
         ncnt = ncnt.astype(float)
     else:
         ncnt = cd.cnt.values.astype(float)
@@ -105,18 +109,19 @@ def propagate(cd : m.CountData,
     # get neighbour index
     nidx = cd.get_allnbr_idx(cd.saturated)
     # Propagate in time
+    iterable = tqdm(range(cd.G))
     times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
                                                  ncnt[:,gene],
                                                  cd,
                                                  nidx,
                                                  **diff_prop) for \
-                               gene in tqdm(iterable))
+                                         gene in iterable)
     times = np.array(times)
 
     return times
 
 def stepping(gene : int,
-             ncnt : np.ndarray,
+             conc : np.ndarray,
              cd : m.CountData,
              nidx : np.ndarray,
              thrs : float,
@@ -127,16 +132,16 @@ def stepping(gene : int,
 
         maxDelta = np.inf
         time  = 0
-
-        conc = ncnt[:,gene].astype(float)
+        # conc = ncnt[:,gene].astype(float)
         while maxDelta > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
-                print("WARNING : Gene : {} did not convege".format(genename))
+                print("WARNING : Gene :"
+                      "{} did not convege"
+                      "".format(genename))
                 break
 
             time +=dt
-
             d2 = cd.laplacian(conc[cd.saturated],
                               conc[nidx],
                               cd.h[cd.saturated])
@@ -144,9 +149,8 @@ def stepping(gene : int,
             conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
 
             conc[conc < 0] = 0
-            # times[gene] = time
-
             maxDelta = np.max(np.abs(dcdt))
+
         return time
 
 def clean_axes(ax : plt.Axes,
@@ -165,7 +169,7 @@ def visualize_genes(cnt : m.CountData,
                     ncols : int = 5,
                     side_size : float = 3,
                     qscale : float = None ,
-                    normalize : bool = True,
+                    normalize : bool = False,
                     pltargs : dict = None,
                     ) -> Tuple:
 
@@ -227,6 +231,7 @@ def get_eigenpatterns( mat : np.ndarray,
 
 
     U,S,_ = np.linalg.svd(mat - mat.mean(axis = 1).reshape(-1,1))
+
     nonzero = np.where(S > 0)[0]
     evecs = U[:,nonzero]
     evals = S**2 / mat.shape[0]
@@ -234,7 +239,7 @@ def get_eigenpatterns( mat : np.ndarray,
     ncomps = np.cumsum(evals)
     ncomps = np.argmax(ncomps / ncomps[-1] > thrs)
 
-    return evecs[:,0:ncomps]
+    return evecs[:,0:ncomps+1]
 
 def get_eigenscores(mat,
                     evecs,
@@ -273,6 +278,7 @@ def get_eigen_dmat(eigenscores : np.ndarray,
 
 def cluster_patterns(dmat : np.ndarray,
                      n_patterns : int,
+                     delta = 0.1,
                      )-> np.ndarray:
 
 
@@ -281,25 +287,49 @@ def cluster_patterns(dmat : np.ndarray,
                            "than number of samples"])
         raise Exception(string)
 
-    cluster = ACl(n_clusters = n_patterns,
-                  affinity = 'precomputed',
-                  linkage = 'complete')
+    
+    smat = np.exp(- dmat / (2 * np.pi ** 2))
 
-    cidx = cluster.fit_predict(dmat)
+    print("[INFO] : Using {} clusters ".format(n_patterns))
+
+    cluster = SpCl(n_clusters = n_patterns,
+                   affinity = 'precomputed')
+
+
+    cidx = cluster.fit_predict(smat)
 
     return cidx
 
-def visualize_clusters(cd : m.CountData,
-                       times : np.ndarray,
-                       ntopgenes : np.ndarray,
+def cluster_data(counts : np.ndarray,
+                 threshold : float = 0.8,
+                 normalize : bool = True,
+                 ):
+
+    # if normalize:
+    #     rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
+    #     ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
+    # else:
+    #     ncnt = cd.cnt.values
+
+    epats = get_eigenpatterns(counts,thrs = threshold)
+
+    n_patterns = epats.shape[1]
+
+    escores = get_eigenscores(counts,epats)
+    cidx = cluster_patterns(get_eigen_dmat(escores),
+                            n_patterns = n_patterns)
+    return cidx
+ 
+def visualize_clusters(counts : np.ndarray,
+                       genes : pd.Index,
+                       crd : np.ndarray,
+                       labels : np.ndarray,
                        ncols : int,
-                       threshold : float = 0.8,
                        side_size : float = 3,
                        pltargs : dict = None,
                        normalize : bool = True,
-                       show_genes : int = None,
                        ):
-    
+
     _pltargs = {'s':40,
                 'edgecolor':'black',
                 'cmap':plt.cm.PuRd,
@@ -310,50 +340,12 @@ def visualize_clusters(cd : m.CountData,
             _pltargs[k] = v
             if k == 'cmap' and isinstance(k,str):
                 _pltargs[k] = eval(v)
-
-    toppatterns = np.argsort(times)[::-1][0:ntopgenes]
-    genes = cd.cnt.columns.values[toppatterns]
-    epats = get_eigenpatterns(cd.cnt.values[:,toppatterns],thrs = threshold)
-    n_patterns = epats.shape[1]
-    
-    nrows = np.ceil(n_patterns / ncols).astype(int)
-    figsize = (1.2 * ncols * side_size,
-               1.2 * nrows * side_size)
-
-    eigviz = list(plt.subplots(nrows,ncols,figsize = figsize))
-    eigviz[0].suptitle('Eigenpatterns')
-    eigviz[-1] = eigviz[-1].flatten()
-
-    for k in range(n_patterns):
-        eigviz[-1][k].scatter(cd.crd[:,0],cd.crd[:,1],
-                              c = epats[:,k],
-                              **_pltargs,
-                              )
-
-        eigviz[-1][k].set_aspect('equal')
-
-    for k in range(eigviz[-1].shape[0]):
-        clean_axes(eigviz[-1][k])
-
-    if normalize:
-        rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
-        ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
-    else:
-        ncnt = cd.cnt.values
-
-
-    escores = get_eigenscores(ncnt[:,toppatterns],epats)
-    labels = cluster_patterns(get_eigen_dmat(escores),
-                              n_patterns = n_patterns)
-
+   
     vizlist = []
     uni_labels = np.unique(labels)
 
     for k,lab in enumerate(uni_labels):
         pos = np.where(labels == lab)[0]
-
-        if show_genes is not None:
-            pos = pos[0:np.min((show_genes,pos.shape[0])).astype(int)]
 
         nrows = np.ceil(pos.shape[0] / ncols).astype(int)
 
@@ -370,9 +362,9 @@ def visualize_clusters(cd : m.CountData,
 
         for ii in range(pos.shape[0]):
             vizlist[-1][1][ii].set_title("Gene : {}".format(genes[pos[ii]]))
-            vizlist[-1][1][ii].scatter(cd.crd[:,0],
-                                       cd.crd[:,1],
-                                       c = cd.cnt.values[:,toppatterns[pos[ii]]],
+            vizlist[-1][1][ii].scatter(crd[:,0],
+                                       crd[:,1],
+                                       c = counts[:,ii],
                                        **_pltargs,
                                        )
 
@@ -383,7 +375,7 @@ def visualize_clusters(cd : m.CountData,
             clean_axes(vizlist[-1][1][jj])
             vizlist[-1][1][jj].set_visible(False)
 
-    return (eigviz,vizlist)
+    return vizlist
 
 
 def change_crd_index(df : pd.Index,

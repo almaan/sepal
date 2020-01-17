@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from abc import ABC,abstractmethod
+from abc import ABC,abstractmethod, abstractproperty
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 import lap
@@ -46,10 +46,9 @@ class CountData(ABC):
                 idx : pd.Index,
                 )->np.ndarray:
 
-        crd = np.array([[float(x) for \
+        crd = np.array([[float(x.replace('X','')) for \
                         x in y.split('x') ] for\
                         y in idx])
-       
         return crd
 
     def _scale_crd(self,
@@ -73,7 +72,7 @@ class CountData(ABC):
         else:
             vs = vs / sm.reshape(1,-1)
 
-        self.cnt = pd.DataFrame(vs/sm.reshape(shape),
+        self.cnt = pd.DataFrame(vs,
                                 index =  self.cnt.index,
                                 columns = self.cnt.columns)
 
@@ -169,6 +168,7 @@ class ST1K(CountData):
     def _format_crd(self,
                 )->None:
 
+        self.crd = self.crd.round(0)
         self._scale_crd()
 
     def _set_edges(self,

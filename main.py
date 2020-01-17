@@ -178,66 +178,77 @@ def main():
     if not osp.exists(args.out_dir):
         os.mkdir(args.out_dir)
 
-    out_df_pth = osp.join(args.out_dir,args.out_dir,'-'.join([analysistag,
+    topgenes = np.argsort(times_all['average'].values)[::-1][0:int(args.n_genes)]
+    topgenes = times_all.index.values[topgenes]
+    counts = cd.cnt.loc[:,topgenes].values
+    
+    if args.cluster :
+        clusters_all = pd.DataFrame(np.zeros((args.n_genes,len(data_list))))
+        clusters_all.columns = pd.Index(sampletags) 
+        clusters_all.index = topgenes
+
+    for cd,sampletag in zip(data_list,sampletags):
+
+        if args.modules is not None and 'plot' in args.modules:
+
+                fig,ax = ut.visualize_genes(cd.cnt.loc[:,times_all.index],
+                                            cd.real_crd,
+                                            times_all['average'].values,
+                                            ncols = args.n_cols,
+                                            side_size = args.side_size,
+                                            n_genes = args.show_genes,
+                                            qscale = args.quantile_scaling,
+                                            pltargs = args.style_dict,
+                                            )
+
+                fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
                                                             'top',
-                                                            'diffusion-times.tsv']
+                                                            'diffusion-times.png']
                                                             )
-                        )
-
-    times_all.to_csv(out_df_pth,
-                     sep = '\t',
-                     header = True,
-                     index = True,
-                     )
-
-    if args.modules is not None and 'plot' in args.modules:
-        for cd,sampletag in zip(data_list,sampletags):
-            fig,ax = ut.visualize_genes(cd.cnt.loc[:,times_all.index],
-                                        cd.real_crd,
-                                        times_all['average'].values,
-                                        ncols = args.n_cols,
-                                        side_size = args.side_size,
-                                        n_genes = args.show_genes,
-                                        qscale = args.quantile_scaling,
-                                        pltargs = args.style_dict,
                                         )
-
-            fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
-                                                        'top',
-                                                        'diffusion-times.png']
-                                                        )
-                                    )
-                        )
+                            )
 
         if args.cluster:
-            args.threshold = np.clip(args.threshold,0,1)
-            eigviz, clusterviz = ut.visualize_clusters(cd,
-                                                       times_all['average'].values,
-                                                       args.n_genes,
-                                                       args.n_cols,
-                                                       threshold = args.threshold,
-                                                       pltargs = args.style_dict,
-                                                       show_genes = args.show_genes,
-                                                       )
+                args.threshold = np.clip(args.threshold,0,1)
 
-            patoname = osp.join(args.out_dir,'-'.join([sampletag,
-                                                        'patterns',
-                                                        'diffusion-times.png'],
-                                                    )
+                cluster_labels = ut.cluster_data(counts,
+                                                 threshold = args.threshold,
+                                                 )
+                clusters_all[sampletag] = cluster_labels
+
+
+                if args.modules is not None and 'plot' in args.modules:
+                    clusterviz = ut.visualize_clusters(counts,
+                                                       genes = topgenes,
+                                                               crd = cd.real_crd,
+                                                               labels = cluster_labels,
+                                                               ncols = args.n_cols,
+                                                               pltargs = args.style_dict,
+                                                               )
+
+                    for cluster in range(len(clusterviz)):
+                        clustoname = osp.join(args.out_dir,'-'.join([sampletag,
+                                                                    'cluster',
+                                                                        str(cluster),
+                                                                    'diffusion-times.png'],
+                                                                        )
+                                                )
+
+                        clusterviz[cluster][0].savefig(clustoname) 
+
+        out_df_pth = osp.join(args.out_dir,args.out_dir,'-'.join([analysistag,
+                                                                    'top',
+                                                                    'diffusion-times.tsv']
+                                                                    )
                                 )
 
-
-            eigviz[0].savefig(patoname) 
-
-            for cluster in range(len(clusterviz)):
-                clustoname = osp.join(args.out_dir,'-'.join([sampletag,
-                                                            'cluster',
-                                                                str(cluster),
-                                                            'diffusion-times.png'],
-                                                                )
-                                        )
-
-                clusterviz[cluster][0].savefig(clustoname) 
+        times_all.to_csv(out_df_pth,
+                            sep = '\t',
+                            header = True,
+                            index = True,
+                            )
+        if args.cluster:
+            print(clusters_all.head())
 
 
 if __name__ == '__main__':
