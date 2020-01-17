@@ -22,9 +22,12 @@ from typing import Tuple
 
 from tqdm import tqdm
 
-import lap
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 
+import lap
 import models as m
+
 
 def print_params(func,*args,**kwargs):
     def wrapper(*args,**kwargs):
@@ -52,25 +55,38 @@ def filter_genes(mat,
                  )->None:
 
     keep_genes = (np.sum(mat.values > 0, axis = 0) > min_occur).astype(int)
+
     keep_genes *= (np.sum(mat.values, axis = 0) > min_expr).astype(int)
-    keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) for x in mat.columns]).astype(int)
+
+    keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) \
+                            for x in mat.columns]).astype(int)
+
     mat = mat.iloc[:,keep_genes.astype(bool)]
     return mat
 
 def propagate(cd : m.CountData,
-              thrs : float = 1e-4,
+              thrs : float = 5e-4,
               dt : float = 0.1,
               stopafter : int = 10e10,
               normalize : bool = True,
               diffusion_rate : int = 1,
-              shuffle : bool = False,
+              num_workers : int = None,
               )-> np.ndarray:
 
-    D = diffusion_rate
-    n_genes =  cd.G 
-    times = np.zeros(n_genes)
-    n_saturated = cd.saturated.shape[0]
+    if num_workers is None:
+        num_workers = int(cpu_count())
+    else:
+        num_workers = min(num_workers,
+                          cpu_count())
 
+    print("[INFO] : Using {} workers".format(n_workers))
+
+    diff_prop = {'D':diffusion_rate,
+                 'thrs':thrs,
+                 'dt':dt,
+                 'stopafter':stopafter}
+
+    n_saturated = cd.saturated.shape[0]
     if n_saturated < 1:
         print("[ERROR] : No Saturated spots")
         sys.exit(-1)
@@ -78,27 +94,41 @@ def propagate(cd : m.CountData,
         print("[INFO] : {} Saturated Spots".format(n_saturated))
 
     if normalize:
-
-        colMax = np.max(cd.cnt.values,axis = 0).reshape(1,-1)
+        rowMean = np.mean(cd.cnt.values,axis = 1).reshape(-1,1)
+        ncnt = np.divide(cd.cnt.values,rowMean,where = rowMean > 0)
+        colMax = np.max(ncnt,axis = 0).reshape(1,-1)
         ncnt = np.divide(cd.cnt.values,colMax,where = colMax > 0)
+        ncnt = ncnt.astype(float)
     else:
-        ncnt = cd.cnt.values
+        ncnt = cd.cnt.values.astype(float)
 
-    if shuffle:
-        shf = np.random.permutation(ncnt.shape[0])
-        ncnt = ncnt[shf,:]
-        iterable = range(n_genes)
-    else:
-        iterable = tqdm(range(n_genes))
-    
-    # Get neighbour indices
+    # get neighbour index
     nidx = cd.get_allnbr_idx(cd.saturated)
-
     # Propagate in time
-    for gene in iterable:
-        conc = ncnt[:,gene].astype(float)
+    times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
+                                                 ncnt[:,gene],
+                                                 cd,
+                                                 nidx,
+                                                 **diff_prop) for \
+                               gene in tqdm(iterable))
+    times = np.array(times)
+
+    return times
+
+def stepping(gene : int,
+             ncnt : np.ndarray,
+             cd : m.CountData,
+             nidx : np.ndarray,
+             thrs : float,
+             D : float,
+             dt : float,
+             stopafter : int,
+             )->float:
+
         maxDelta = np.inf
         time  = 0
+
+        conc = ncnt[:,gene].astype(float)
         while maxDelta > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
@@ -114,11 +144,10 @@ def propagate(cd : m.CountData,
             conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
 
             conc[conc < 0] = 0
-            times[gene] = time
+            # times[gene] = time
 
             maxDelta = np.max(np.abs(dcdt))
-
-    return times
+        return time
 
 def clean_axes(ax : plt.Axes,
                 )->None:
@@ -302,8 +331,10 @@ def visualize_clusters(cd : m.CountData,
                               )
 
         eigviz[-1][k].set_aspect('equal')
+
+    for k in range(eigviz[-1].shape[0]):
         clean_axes(eigviz[-1][k])
-        
+
     if normalize:
         rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
         ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
