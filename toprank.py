@@ -8,8 +8,6 @@ from scipy.stats import fisher_exact as fe
 
 import matplotlib.pyplot as plt
 
-# diff_pth = "/tmp/vis-mob/20200110135122016273-top-diffusion-times.tsv"
-# cnt_pth = "/home/alma/Documents/PhD/papers/STSC/data/molb/st/science/Rep10_MOB.st_mat.processed.tsv"
 
 n_examine = int( sys.argv[1] )
 n_topexpr = int( sys.argv[2] )

@@ -1,17 +1,23 @@
 #!/usr/bin/env python3
 
-from rpy2.robjects.packages import importr
-import rpy2.robjects as ro
-from rpy2.robjects import pandas2ri
 from rpy2.rinterface_lib.embedded import RRuntimeError
-
-pandas2ri.activate()
+from rpy2.robjects.packages import importr
+from rpy2.robjects import pandas2ri
+import rpy2.robjects as ro
 
 import numpy as np
 import pandas as pd
 
+from os import mkdir
+import os.path as osp
 
-def enrichment_analysis(res,dbs,alpha = 0.05):
+from typing import List
+
+pandas2ri.activate()
+
+def enrichment_analysis(res: pd.DataFrame,
+                        dbs : list = ["GO_Biological_Process_2018"],
+                        alpha : float = 0.05) -> List[pd.DataFrame]:
 
     try:
         enrichR = importr("enrichR")
@@ -24,7 +30,6 @@ def enrichment_analysis(res,dbs,alpha = 0.05):
     av_dbs = enrichR.listEnrichrDbs()["libraryName"].values
 
     dbs = list(filter(lambda x : x in av_dbs, dbs))
-    print(dbs)
 
     if len(dbs) < 1:
         print("[ERROR] : None of the specified databases are available")
@@ -53,13 +58,21 @@ def enrichment_analysis(res,dbs,alpha = 0.05):
 
     return enriched 
 
+def save_enrihment_results(enr_res : dict,
+                           out_dir : str,
+                           )->None:
 
-if __name__ == '__main__':
 
-    pth = "/tmp/vis-bc/20200119164303924935-cluster-index.tsv"
-    res = pd.read_csv(pth, sep = '\t', header = 0, index_col = 0)
-    dbs = ["GO_Biological_Process_2018"]
-    test = enrichment_analysis(res,dbs)
+    out_dir_enr = osp.join(out_dir,"enrichment")
+    if not osp.exists(out_dir_enr):
+        mkdir(out_dir_enr)
 
-    for ii in test[dbs[0]]:
-        print(ii)
+    for db_name,res_list in enr_res.items():
+        for cluster,res in enumerate(res_list):
+            bname = 'enr-db-' + db_name + '-cl-' + str(cluster) + '.tsv'
+            res.to_csv(osp.join(out_dir_enr,bname),
+                       sep = '\t',
+                       header = True,
+                       index = True)
+
+    return None

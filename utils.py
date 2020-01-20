@@ -18,6 +18,7 @@ from scipy.spatial.distance import cdist
 
 from sklearn.cluster import AgglomerativeClustering as ACl
 from sklearn.cluster import SpectralClustering as SpCl
+from sklearn.mixture import BayesianGaussianMixture as DP
 
 from typing import Tuple
 
@@ -95,13 +96,14 @@ def propagate(cd : m.CountData,
         print("[INFO] : {} Saturated Spots".format(n_saturated))
 
     if normalize:
-        rowMean = np.mean(cd.cnt.values,
-                          axis = 1).reshape(-1,1)
-        ncnt = np.divide(cd.cnt.values,
-                         rowMean,where = rowMean > 0)
+
+        ncnt = cd.cnt.values
+
         colMax = np.max(ncnt,axis = 0).reshape(1,-1)
-        ncnt = np.divide(cd.cnt.values,
+
+        ncnt = np.divide(ncnt,
                          colMax,where = colMax > 0)
+
         ncnt = ncnt.astype(float)
     else:
         ncnt = cd.cnt.values.astype(float)
@@ -110,6 +112,7 @@ def propagate(cd : m.CountData,
     nidx = cd.get_allnbr_idx(cd.saturated)
     # Propagate in time
     iterable = tqdm(range(cd.G))
+
     times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
                                                  ncnt[:,gene],
                                                  cd,
@@ -119,6 +122,7 @@ def propagate(cd : m.CountData,
     times = np.array(times)
 
     return times
+
 
 def stepping(gene : int,
              conc : np.ndarray,
@@ -149,7 +153,8 @@ def stepping(gene : int,
             conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
 
             conc[conc < 0] = 0
-            maxDelta = np.max(np.abs(dcdt))
+
+            maxDelta = np.sum(np.abs(dcdt)) / dcdt.shape[0]
 
         return time
 
@@ -165,7 +170,7 @@ def clean_axes(ax : plt.Axes,
 def visualize_genes(cnt : m.CountData,
                     crd : np.ndarray,
                     times : np.ndarray,
-                    n_genes : int = 20,
+                    # n_genes : int = 20,
                     ncols : int = 5,
                     side_size : float = 3,
                     qscale : float = None ,
@@ -180,7 +185,8 @@ def visualize_genes(cnt : m.CountData,
     else:
         ncnt = cnt.values
 
-    topgenes = np.argsort(times)[::-1][0:n_genes]
+    # topgenes = np.argsort(times)[::-1][0:n_genes]
+    n_genes = cnt.shape[1]
     nrows = np.ceil(n_genes / ncols).astype(int)
 
     figsize = (1.2 * ncols * side_size,
@@ -203,7 +209,7 @@ def visualize_genes(cnt : m.CountData,
                 _pltargs[k] = eval(v)
 
     for ii in range(n_genes):
-        vals = ncnt[:,topgenes[ii]].reshape(-1,)
+        vals = ncnt[:,ii].reshape(-1,)
         if qscale is not None:
             if qscale > 0 and qscale < 1:
                 vals_q = np.quantile(vals,qscale)
@@ -212,8 +218,8 @@ def visualize_genes(cnt : m.CountData,
                 print('WARNING : {} is not a proper quantile value'.format(qscale),
                       'within range (0,1)')
 
-        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cnt.columns[topgenes[ii]],
-                                                             times[topgenes[ii]]))
+        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cnt.columns[ii],
+                                                                  times[ii]))
         ax[ii].scatter(crd[:,0],
                        crd[:,1],
                        c = vals,
@@ -318,6 +324,9 @@ def cluster_data(counts : np.ndarray,
     escores = get_eigenscores(counts,epats)
     cidx = cluster_patterns(get_eigen_dmat(escores),
                             n_patterns = n_patterns)
+
+    # cidx = cluster_patterns(escores,n_patterns)
+
     return cidx
  
 def visualize_clusters(counts : np.ndarray,
@@ -356,7 +365,7 @@ def visualize_clusters(counts : np.ndarray,
                                          ncols,
                                          figsize = figsize)))
 
-        vizlist[-1][0].suptitle("Eigengroup {}".format(k))
+        vizlist[-1][0].suptitle("Eigengroup {}".format(k+1))
 
         vizlist[-1][1] = vizlist[-1][1].flatten()
 
@@ -364,7 +373,7 @@ def visualize_clusters(counts : np.ndarray,
             vizlist[-1][1][ii].set_title("Gene : {}".format(genes[pos[ii]]))
             vizlist[-1][1][ii].scatter(crd[:,0],
                                        crd[:,1],
-                                       c = counts[:,ii],
+                                       c = counts[:,pos[ii]],
                                        **_pltargs,
                                        )
 
