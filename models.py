@@ -155,6 +155,14 @@ class CountData(ABC):
                   )-> np.ndarray:
         pass
 
+    # @abstractmethod
+    # def gradient(self,
+    #              centers : np.ndarray,
+    #              nbrs : np.ndarray,
+    #              h: np.ndarray,
+    #              ) -> np.ndarray:
+    #     pass
+
 class ST1K(CountData):
     def __init__(self,
                  cnt : pd.DataFrame,
@@ -185,7 +193,17 @@ class ST1K(CountData):
 
         return laplacian_rect(centers,nbrs,h)
 
+    def gradient(self,
+            centers : np.ndarray,
+            nbrs : np.ndarray,
+            h : np.ndarray,
+            )-> np.ndarray:
 
+        dx = nbrs[:,1] - nbrs[:,0] / h
+        dy = nbrs[:,3] - nbrs[:,2] / h
+
+
+        return dx + dy
 
 class VisiumData(CountData):
 
@@ -310,7 +328,6 @@ class UnstructuredData(CountData):
             ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
 
             h = dmat[np.arange(dmat.shape[0]),cidxs]
-            print(h)
             h = h / h.max()
             h = h.reshape(-1,)
 

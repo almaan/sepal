@@ -63,6 +63,8 @@ def main():
                      required = True,
                      help = 'array type')
 
+    args = prs.parse_args()
+
     analysistag = ut.timestamp()
 
     print("[INFO] : will analyze samples: ")
