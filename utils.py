@@ -6,6 +6,7 @@ import re
 
 
 import datetime
+import time as Time
 import re
 import sys
 
@@ -16,9 +17,13 @@ import matplotlib.pyplot as plt
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 
-from sklearn.cluster import AgglomerativeClustering as ACl
-from sklearn.cluster import SpectralClustering as SpCl
-from sklearn.mixture import BayesianGaussianMixture as DP
+# from sklearn.cluster import AgglomerativeClustering as ACl
+# from sklearn.cluster import SpectralClustering as SpCl
+# from sklearn.mixture import BayesianGaussianMixture as DP
+
+from sklearn.cluster import OPTICS as Cl
+
+from scipy.stats import fisher_exact as fe
 
 from typing import Tuple
 
@@ -67,7 +72,7 @@ def filter_genes(mat,
     return mat
 
 def propagate(cd : m.CountData,
-              thrs : float = 5e-4,
+              thrs : float = 1e-7,
               dt : float = 0.1,
               stopafter : int = 10e10,
               normalize : bool = True,
@@ -99,12 +104,18 @@ def propagate(cd : m.CountData,
 
         ncnt = cd.cnt.values
 
+        #used means for good res
+        rowSums = np.mean(ncnt,axis = 1).reshape(-1,1)
+
+        ncnt = np.divide(ncnt,rowSums,where = rowSums > 0)
+
         colMax = np.max(ncnt,axis = 0).reshape(1,-1)
 
         ncnt = np.divide(ncnt,
                          colMax,where = colMax > 0)
 
         ncnt = ncnt.astype(float)
+
     else:
         ncnt = cd.cnt.values.astype(float)
 
@@ -136,27 +147,38 @@ def stepping(gene : int,
 
         maxDelta = np.inf
         time  = 0
-        # conc = ncnt[:,gene].astype(float)
-        while maxDelta > thrs and conc[cd.saturated].sum() > 0:
+
+        # q = np.quantile(conc,0.99,interpolation = 'nearest')
+        # conc[conc > q] = q
+
+        old_maxDelta = 1
+        dcdt = 0
+        
+        while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
                 print("WARNING : Gene :"
-                      "{} did not convege"
+                      "{} did not converge"
                       "".format(genename))
                 break
 
+            old_maxDelta = maxDelta 
+
             time +=dt
+
             d2 = cd.laplacian(conc[cd.saturated],
                               conc[nidx],
                               cd.h[cd.saturated])
-            dcdt = D*d2
-            conc[cd.saturated] = conc[cd.saturated] +  dcdt*dt 
 
+            dcdt = D*d2 
+
+            conc[cd.saturated] += dcdt*dt 
             conc[conc < 0] = 0
 
-            maxDelta = np.sum(np.abs(dcdt)) / dcdt.shape[0]
+            maxDelta = np.max(np.abs(dcdt)) 
 
         return time
+
 
 def clean_axes(ax : plt.Axes,
                 )->None:
@@ -308,24 +330,18 @@ def cluster_patterns(dmat : np.ndarray,
 
 def cluster_data(counts : np.ndarray,
                  threshold : float = 0.8,
-                 normalize : bool = True,
                  ):
-
-    # if normalize:
-    #     rowsums = np.sum(cd.cnt.values,axis = 1).reshape(-1,1)
-    #     ncnt = np.divide(cd.cnt.values,rowsums,where = rowsums > 0)
-    # else:
-    #     ncnt = cd.cnt.values
 
     epats = get_eigenpatterns(counts,thrs = threshold)
 
     n_patterns = epats.shape[1]
 
-    escores = get_eigenscores(counts,epats)
-    cidx = cluster_patterns(get_eigen_dmat(escores),
-                            n_patterns = n_patterns)
+    print("[INFO] : Using {} eigenpatterns".format(n_patterns))
 
-    # cidx = cluster_patterns(escores,n_patterns)
+    escores = get_eigenscores(counts,epats)
+
+    cidx = Cl(metric = 'cosine',
+              min_samples = 3).fit_predict(escores.T)
 
     return cidx
  
@@ -354,6 +370,9 @@ def visualize_clusters(counts : np.ndarray,
     uni_labels = np.unique(labels)
 
     for k,lab in enumerate(uni_labels):
+        if lab == -1:
+            continue
+
         pos = np.where(labels == lab)[0]
 
         nrows = np.ceil(pos.shape[0] / ncols).astype(int)
@@ -365,7 +384,7 @@ def visualize_clusters(counts : np.ndarray,
                                          ncols,
                                          figsize = figsize)))
 
-        vizlist[-1][0].suptitle("Eigengroup {}".format(k+1))
+        vizlist[-1][0].suptitle("Eigengroup {}".format(k))
 
         vizlist[-1][1] = vizlist[-1][1].flatten()
 
@@ -402,4 +421,54 @@ def change_crd_index(df : pd.Index,
 
 def timestamp() -> str:
     return re.sub(':|-|\.| |','',str(datetime.datetime.now()))
+
+def toprank(cnt : pd.DataFrame,
+            diff : pd.DataFrame,
+            )-> None:
+
+    ginter = diff.index.intersection(cnt.columns)
+    cnt = cnt.loc[:,ginter]
+    diff = diff.loc[ginter]
+    cnt_s = cnt.values.sum(axis = 0)
+
+    cont = True
+
+    while cont:
+
+        n_examine = input("# genes from result >> ")
+        n_topexpr = input("# top expressed genes >> ")
+
+        if n_examine.isdigit() and  n_topexpr.isdigit():
+            n_examine = int(n_examine)
+            n_topexpr = int(n_topexpr)
+        else:
+            cont = False
+            break
+
+        cnt_g = cnt.columns.values
+        cnt_ordr = np.argsort(cnt_s)[::-1]
+        cnt_g = cnt_g[cnt_ordr]
+
+        diff_g = diff.index.values
+        diff_ordr = np.argsort(diff.values)[::-1]
+
+        diff_g = diff_g[diff_ordr]
+
+        sd = set(diff_g[0:n_examine])
+        sc = set(cnt_g[0:n_topexpr])
+
+        inter = sd.intersection(sc)
+        ninter = len(inter)
+
+        cmat = np.array([[ninter,n_examine -ninter,],
+                        [n_topexpr - ninter,
+                        cnt.shape[0]-n_examine-n_topexpr+ninter]])
+
+        _,pval = fe(cmat)
+
+        print()
+        print("[TOP SPATIAL PATTERNS]: {} genes".format(n_examine))
+        print("[TOP EXPRESSED] : {} genes".format(n_topexpr))
+        print("[INTERSECTION] : {} genes ".format(ninter))
+        print("[P-VALUE] : {} ".format(pval))
 

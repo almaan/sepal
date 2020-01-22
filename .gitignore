@@ -1,0 +1,4 @@
+.mypy*/
+__pychache__/
+*.bak.*
+old/
