@@ -20,6 +20,7 @@ from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 
 from sklearn.cluster import OPTICS as Cl
+from sklearn.cluster import AgglomerativeClustering as ACl
 
 from scipy.stats import fisher_exact as fe
 
@@ -244,15 +245,40 @@ def visualize_genes(cnt : m.CountData,
 
     return (fig,ax)
 
+def get_eigen_dmat(vals : np.ndarray,
+                   normalized : bool = True,
+                   ) -> np.ndarray :
+
+    n_samples = vals.shape[0]
+    dmat = np.zeros((n_samples,n_samples))
+
+    if not normalized:
+        nrm = np.linalg.norm(vals,axis = 1)
+        vals = eigenscores / nrm.reshape(-1,1)
+
+    for ii in range(n_samples-1):
+        u = vals[ii,:]
+        for jj in range(ii+1,n_samples):
+            v = vals[jj,:]
+            dmat[ii,jj] = np.arccos(np.dot(u,v))
+            dmat[jj,ii] = dmat[ii,jj]
+
+    return dmat
+
+
 
 def get_eigen( mat : np.ndarray,
                thrs : float = 0.99,
-               normalize : bool = True,
                )-> np.ndarray :
 
+    # matrix is n_spots x n_genes
+    x_hat = mat.T
+    # now n_genes x n_spots
+    mu = x_hat.mean(axis=0).reshape(1,-1)
+    std = x_hat.std(axis = 0).reshape(1,-1)
+    x_hat = ( x_hat - mu ) / std
 
-    x_hat = mat - mat.mean(axis = 1).reshape(-1,1)
-    cov = np.cov(x_hat.T, rowvar = False)
+    cov = np.cov(x_hat, rowvar = False)
 
     evals,evecs = np.linalg.eigh(cov)
 
@@ -260,36 +286,51 @@ def get_eigen( mat : np.ndarray,
     evecs = evecs[:,idx]
     evals = evals[idx]
 
+    evecs *= -1
+
     cs = np.cumsum(evals)
+
     n_comps = np.argmax( cs / cs[-1] > thrs)
 
     evecs = evecs[:,0:n_comps+1]
 
-    proj = np.dot(x_hat.T,evecs)
+    proj = np.dot(x_hat,evecs)
 
     return (evecs,proj)
 
 def cluster_data(counts : np.ndarray,
+                 n_base = 500,
+                 n_projs = 100,
                  threshold : float = 0.9,
                  ):
 
-    epats,escores = get_eigen(counts,
-                              thrs = threshold)
+    epats,projs = get_eigen(counts[:,0:n_base],
+                            thrs = threshold)
+
+    projs = projs[0:n_projs,:]
+
+    projs /=  np.linalg.norm(projs,axis = 1).reshape(-1,1)
 
     n_patterns = epats.shape[1]
 
     print("[INFO] : Using {} eigenpatterns".format(n_patterns))
 
-    cidx = Cl(metric = 'cosine',
+    cidx = Cl(metric = 'precomputed',
               max_eps = np.inf,
               xi = 0.01,
-              min_samples = 2).fit_predict(escores)
+              min_samples = 2).fit_predict(get_eigen_dmat(projs))
+
+    # cidx = ACl(n_clusters = n_patterns,
+    #            affinity = 'precomputed',
+    #            linkage = 'complete',
+    #            ).fit_predict(get_eigen_dmat(projs))
+
 
     n_clusters = np.unique(cidx)
     n_clusters = n_clusters[n_clusters >= 0]
     n_clusters = n_clusters.shape[0]
 
-    print("[INFO] : Identified {} clusters".format(n_patterns))
+    print("[INFO] : Identified {} clusters".format(n_clusters))
 
     return cidx
  

@@ -70,6 +70,13 @@ def main():
                    help = 'show number of genes',
                    )
 
+    prs.add_argument('-cb','--cluster_base',
+                   default = None,
+                   required = False,
+                   type = int,
+                   help = 'show number of genes',
+                   )
+
     prs.add_argument('-eps','--threshold',
                       default = 0.995,
                       type = float,
@@ -181,16 +188,25 @@ def main():
 
     if 'cluster' in args.analysis:
 
-        sel_genes = sort_genes[0:int(args.cluster_genes)]
-        cluster_genes = times_all.index.values[sel_genes]
+        if args.cluster_base is None:
+            args.cluster_base = np.min((args.cluster_genes*2,
+                                        times_all.shape[0]))
+        else:
+            args.cluster_base = np.min((args.cluster_base,
+                                        times_all.shape[0]))
+
+
+        cluster_genes = times_all.index.values[sort_genes]
 
         args.threshold = np.clip(args.threshold,0,1)
         cluster_labels = ut.cluster_data(cd.cnt.loc[:,cluster_genes].values,
+                                         n_base = args.cluster_base,
+                                         n_projs = args.cluster_genes,
                                          threshold = args.threshold,
                                         )
 
         clusters = pd.DataFrame(cluster_labels,
-                                index = cluster_genes,
+                                index = cluster_genes[0:args.cluster_genes],
                                 columns = ['cluster'],
                                 )
 
@@ -205,8 +221,8 @@ def main():
                         )
 
         if args.modules is not None and 'plot' in args.modules:
-            clusterviz = ut.visualize_clusters(cd.cnt.loc[:,cluster_genes].values,
-                                               genes = cluster_genes,
+            clusterviz = ut.visualize_clusters(cd.cnt.loc[:,cluster_genes[0:args.cluster_genes]].values,
+                                               genes = cluster_genes[0:args.cluster_genes],
                                                crd = cd.real_crd,
                                                labels = cluster_labels,
                                                ncols = args.n_cols,
