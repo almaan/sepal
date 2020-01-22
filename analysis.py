@@ -51,6 +51,7 @@ def main():
                         default = ['genes'],
                         choices = ['genes',
                                    'cluster',
+                                   'toprank',
                                    'enrich'])
 
 
@@ -69,7 +70,7 @@ def main():
                    )
 
     prs.add_argument('-eps','--threshold',
-                      default = 0.8,
+                      default = 0.995,
                       type = float,
                       help = 'threshold in clustering',
                       )
@@ -121,7 +122,9 @@ def main():
 
     args = prs.parse_args()
 
-    requires_counts = ['cluster','genes']
+    requires_counts = ['cluster',
+                       'genes',
+                       'toprank']
 
     if any( [x in args.analysis for x in requires_counts]):
 
@@ -225,8 +228,14 @@ def main():
         enr.save_enrihment_results(enrichment_results,
                                     args.out_dir)
 
+    if 'toprank' in args.analysis and len(args.analysis) == 1:
+        ut.toprank(cnt = cd.cnt,
+                   diff = times_all[sel_column])
+
+
 if __name__ == '__main__':
     try:
         main()
     except KeyboardInterrupt:
+        print("\n")
         print("[INFO] : Terminated by user")
