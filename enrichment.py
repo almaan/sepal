@@ -36,15 +36,16 @@ def enrichment_analysis(res: pd.DataFrame,
         return []
 
     cluster_ids = np.unique(res.values[:,0])
+    cluster_ids = np.sort(cluster_ids[cluster_ids >= 0])
     enriched  = dict() 
 
     for k,db in enumerate(dbs):
-        enriched.update({db:[]})
+        enriched.update({db:{}})
         for cluster in cluster_ids:
 
             pos = res.values[:,0] == cluster
             if pos.sum() < 2:
-                enriched[db].append(pd.DataFrame([]))
+                enriched[db].update({cluster:pd.DataFrame([])})
                 continue
 
             genes = ro.StrVector(res.index.values[pos])
@@ -54,7 +55,7 @@ def enrichment_analysis(res: pd.DataFrame,
 
             enrres_df = enrres_df.iloc[enrres_df['Adjusted.P.value'].values < alpha,:]
 
-            enriched[db].append(enrres_df)
+            enriched[db].update({cluster:enrres_df})
 
     return enriched 
 
@@ -68,7 +69,7 @@ def save_enrihment_results(enr_res : dict,
         mkdir(out_dir_enr)
 
     for db_name,res_list in enr_res.items():
-        for cluster,res in enumerate(res_list):
+        for cluster,res in res_list.items():
             bname = 'enr-db-' + db_name + '-cl-' + str(cluster) + '.tsv'
             res.to_csv(osp.join(out_dir_enr,bname),
                        sep = '\t',

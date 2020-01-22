@@ -51,6 +51,7 @@ def main():
                         default = ['genes'],
                         choices = ['genes',
                                    'cluster',
+                                   'cdf',
                                    'toprank',
                                    'enrich'])
 
@@ -122,6 +123,20 @@ def main():
 
     args = prs.parse_args()
 
+    if args.results is not None:
+
+        times_all = pd.read_csv(args.results,
+                                sep = '\t',
+                                header = 0,
+                                index_col = 0)
+
+        sampletag = '.'.join(osp.basename(args.results).split('.')[0:-1])
+
+        sampletag = sampletag.split('-')[0]
+
+        sel_column = 'average'
+        sort_genes = np.argsort(times_all[sel_column].values)[::-1]
+
     requires_counts = ['cluster',
                        'genes',
                        'toprank']
@@ -139,13 +154,8 @@ def main():
         cd = Data[args.array](cnt,eps = 0.2,normalize = False)
 
 
-        times_all = pd.read_csv(args.results,
-                                sep = '\t',header = 0,
-                                index_col = 0)
 
         sampletag = '.'.join(osp.basename(args.count_data).split('.')[0:-1])
-        sel_column = 'average'
-        sort_genes = np.argsort(times_all[sel_column].values)[::-1]
 
     if 'genes' in args.analysis:
         if args.modules is not None and 'plot' in args.modules:
@@ -179,8 +189,8 @@ def main():
                                          threshold = args.threshold,
                                         )
 
-        clusters = pd.DataFrame(cluster_labels + 1,
-                                cluster_genes,
+        clusters = pd.DataFrame(cluster_labels,
+                                index = cluster_genes,
                                 columns = ['cluster'],
                                 )
 
@@ -204,9 +214,9 @@ def main():
                                                )
 
             for cl in range(len(clusterviz)):
-                clustoname = osp.join(args.out_dir,'-'.join([sampletag,
-                                                            'cluster',
-                                                                str(cl + 1),
+                clustoname = osp.join(args.out_dir,''.join([sampletag,
+                                                            '-cluster-',
+                                                                str(cl),
                                                             '.png'],
                                                                 ))
                 clusterviz[cl][0].savefig(clustoname)
@@ -231,6 +241,15 @@ def main():
     if 'toprank' in args.analysis and len(args.analysis) == 1:
         ut.toprank(cnt = cd.cnt,
                    diff = times_all[sel_column])
+
+    if "cdf" in args.analysis:
+        cdffig, cdfax = ut.visualize_cdf(diff = times_all[sel_column].values)
+        cdfname = osp.join(args.out_dir,''.join([sampletag,
+                                                '-cdf',
+                                                '.png'],
+                                                    ))
+        cdffig.savefig(cdfname)
+
 
 
 if __name__ == '__main__':

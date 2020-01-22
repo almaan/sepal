@@ -12,14 +12,12 @@ import sys
 
 import numpy as np
 import pandas as pd
+
 import matplotlib.pyplot as plt
+from matplotlib import rcParams
 
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
-
-# from sklearn.cluster import AgglomerativeClustering as ACl
-# from sklearn.cluster import SpectralClustering as SpCl
-# from sklearn.mixture import BayesianGaussianMixture as DP
 
 from sklearn.cluster import OPTICS as Cl
 
@@ -35,13 +33,13 @@ from multiprocessing import cpu_count
 import lap
 import models as m
 
+rcParams.update({'figure.max_open_warning': 0})
 
 def print_params(func,*args,**kwargs):
     def wrapper(*args,**kwargs):
         print("Function : {} | Parameters : {} {} ".format(func.__name__,
                                                            args,
-                                                           kwargs),
-             )    
+                                                           kwargs))
         return func(*args,**kwargs)
     return wrapper
 
@@ -148,9 +146,6 @@ def stepping(gene : int,
         maxDelta = np.inf
         time  = 0
 
-        # q = np.quantile(conc,0.99,interpolation = 'nearest')
-        # conc[conc > q] = q
-
         old_maxDelta = 1
         dcdt = 0
         
@@ -192,7 +187,6 @@ def clean_axes(ax : plt.Axes,
 def visualize_genes(cnt : m.CountData,
                     crd : np.ndarray,
                     times : np.ndarray,
-                    # n_genes : int = 20,
                     ncols : int = 5,
                     side_size : float = 3,
                     qscale : float = None ,
@@ -207,7 +201,6 @@ def visualize_genes(cnt : m.CountData,
     else:
         ncnt = cnt.values
 
-    # topgenes = np.argsort(times)[::-1][0:n_genes]
     n_genes = cnt.shape[1]
     nrows = np.ceil(n_genes / ncols).astype(int)
 
@@ -252,96 +245,51 @@ def visualize_genes(cnt : m.CountData,
     return (fig,ax)
 
 
-def get_eigenpatterns( mat : np.ndarray,
-                       thrs : float = 0.99,
-                       normalize : bool = True,
-                       )-> np.ndarray :
+def get_eigen( mat : np.ndarray,
+               thrs : float = 0.99,
+               normalize : bool = True,
+               )-> np.ndarray :
 
 
-    U,S,_ = np.linalg.svd(mat - mat.mean(axis = 1).reshape(-1,1))
+    x_hat = mat - mat.mean(axis = 1).reshape(-1,1)
+    cov = np.cov(x_hat.T, rowvar = False)
 
-    nonzero = np.where(S > 0)[0]
-    evecs = U[:,nonzero]
-    evals = S**2 / mat.shape[0]
+    evals,evecs = np.linalg.eigh(cov)
 
-    ncomps = np.cumsum(evals)
-    ncomps = np.argmax(ncomps / ncomps[-1] > thrs)
+    idx = np.argsort(evals)[::-1]
+    evecs = evecs[:,idx]
+    evals = evals[idx]
 
-    return evecs[:,0:ncomps+1]
+    cs = np.cumsum(evals)
+    n_comps = np.argmax( cs / cs[-1] > thrs)
 
-def get_eigenscores(mat,
-                    evecs,
-                    )-> np.ndarray:
+    evecs = evecs[:,0:n_comps+1]
 
-    coef = np.linalg.lstsq(evecs,
-                           mat,
-                           rcond = None)[0]
+    proj = np.dot(x_hat.T,evecs)
 
-    coef_norms = np.linalg.norm(coef,axis = 0)
-    normed_coefs = coef / coef_norms.reshape(1,-1)
-
-    return normed_coefs
-
-
-def get_eigen_dmat(eigenscores : np.ndarray,
-                   normalized : bool = True,
-                      ) -> np.ndarray :
-
-
-    n_pats = eigenscores.shape[1]
-    dmat = np.zeros((n_pats,n_pats))
-
-    if not normalized:
-        nrm = np.linalg.norm(eigenscores,axis = 0)
-        eigenscores = eigenscores / nrm.reshape(1,-1)
-
-    for ii in range(n_pats-1):
-        u = eigenscores[:,ii]
-        for jj in range(ii+1,n_pats):
-            v = eigenscores[:,jj]
-            dmat[ii,jj] = np.arccos(np.dot(u,v))
-            dmat[jj,ii] = dmat[ii,jj]
-
-    return dmat
-
-def cluster_patterns(dmat : np.ndarray,
-                     n_patterns : int,
-                     delta = 0.1,
-                     )-> np.ndarray:
-
-
-    if n_patterns > dmat.shape[0]:
-        string = ' '.join(["Number of patterns larger",
-                           "than number of samples"])
-        raise Exception(string)
-
-    
-    smat = np.exp(- dmat / (2 * np.pi ** 2))
-
-    print("[INFO] : Using {} clusters ".format(n_patterns))
-
-    cluster = SpCl(n_clusters = n_patterns,
-                   affinity = 'precomputed')
-
-
-    cidx = cluster.fit_predict(smat)
-
-    return cidx
+    return (evecs,proj)
 
 def cluster_data(counts : np.ndarray,
-                 threshold : float = 0.8,
+                 threshold : float = 0.9,
                  ):
 
-    epats = get_eigenpatterns(counts,thrs = threshold)
+    epats,escores = get_eigen(counts,
+                              thrs = threshold)
 
     n_patterns = epats.shape[1]
 
     print("[INFO] : Using {} eigenpatterns".format(n_patterns))
 
-    escores = get_eigenscores(counts,epats)
-
     cidx = Cl(metric = 'cosine',
-              min_samples = 3).fit_predict(escores.T)
+              max_eps = np.inf,
+              xi = 0.01,
+              min_samples = 2).fit_predict(escores)
+
+    n_clusters = np.unique(cidx)
+    n_clusters = n_clusters[n_clusters >= 0]
+    n_clusters = n_clusters.shape[0]
+
+    print("[INFO] : Identified {} clusters".format(n_patterns))
 
     return cidx
  
@@ -368,10 +316,9 @@ def visualize_clusters(counts : np.ndarray,
    
     vizlist = []
     uni_labels = np.unique(labels)
+    uni_labels = np.sort(uni_labels[uni_labels >= 0])
 
     for k,lab in enumerate(uni_labels):
-        if lab == -1:
-            continue
 
         pos = np.where(labels == lab)[0]
 
@@ -384,7 +331,7 @@ def visualize_clusters(counts : np.ndarray,
                                          ncols,
                                          figsize = figsize)))
 
-        vizlist[-1][0].suptitle("Eigengroup {}".format(k))
+        vizlist[-1][0].suptitle("Eigengroup {}".format(lab))
 
         vizlist[-1][1] = vizlist[-1][1].flatten()
 
@@ -420,7 +367,8 @@ def change_crd_index(df : pd.Index,
     return (df,old_idx) 
 
 def timestamp() -> str:
-    return re.sub(':|-|\.| |','',str(datetime.datetime.now()))
+    return re.sub(':|-|\.| |','',
+                  str(datetime.datetime.now()))
 
 def toprank(cnt : pd.DataFrame,
             diff : pd.DataFrame,
@@ -471,4 +419,27 @@ def toprank(cnt : pd.DataFrame,
         print("[TOP EXPRESSED] : {} genes".format(n_topexpr))
         print("[INTERSECTION] : {} genes ".format(ninter))
         print("[P-VALUE] : {} ".format(pval))
+
+def visualize_cdf(diff : np.ndarray,
+                  )-> Tuple[plt.Figure,plt.Axes]:
+
+    cs = np.cumsum(np.sort(diff)[::-1])
+    fig, ax = plt.subplots(1,1,figsize = (10,10))
+
+    ax.plot(cs, '-',
+            color = 'black',
+            )
+
+    # ax.set_aspect("equal")
+
+    ax.set_title("ECDF of Diffusion values")
+    ax.set_xlabel("Ranked Sample")
+    ax.set_ylabel("Cummulative Sum")
+
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
+    return (fig,ax)
+
+
 
