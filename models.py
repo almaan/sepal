@@ -81,6 +81,7 @@ class CountData(ABC):
 
         self.saturated = []
         self.unsaturated = []
+
         for spot in range(self.S):
             nbr = self.kdt.query_ball_point(self.crd[spot,:],
                                             self.r + self.eps,
@@ -93,7 +94,7 @@ class CountData(ABC):
         self.saturated = np.array(self.saturated).astype(int)
         self.saturated_idx = self.cnt.index[self.saturated]
 
-    def get_allnbr_idx(self,
+    def get_satnbr_idx(self,
                        sel : np.ndarray,
                        ) -> np.ndarray:
 
@@ -109,6 +110,21 @@ class CountData(ABC):
                         narr[k,pos] = nbrs[k][n]
 
         return narr.astype(int)
+
+    def get_unsatnbr_idx(self,
+                       sel : np.ndarray,
+                       ) -> np.ndarray:
+
+        dmat = cdist(self.crd,self.crd)
+        dmat = dmat[sel,:]
+        dmat[:,sel] = np.inf
+
+        
+        nbrs = np.argsort(dmat,axis = 1)
+        nbrs = nbrs[:,0]
+        
+        return nbrs.astype(int)
+
 
 
 
@@ -193,20 +209,8 @@ class ST1K(CountData):
 
         return laplacian_rect(centers,nbrs,h)
 
-    def gradient(self,
-            centers : np.ndarray,
-            nbrs : np.ndarray,
-            h : np.ndarray,
-            )-> np.ndarray:
-
-        dx = nbrs[:,1] - nbrs[:,0] / h
-        dy = nbrs[:,3] - nbrs[:,2] / h
-
-
-        return dx + dy
 
 class VisiumData(CountData):
-
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 

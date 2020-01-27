@@ -40,9 +40,12 @@ def main():
                                 ],
                      help = 'array type')
 
-    
+    prs.add_argument('-tr','--transpose',
+                     required = False,
+                     default = False,
+                     action = 'store_true',
+                     help = 'transpose count matrix')
 
-    
     # gene_prs = sub_prs.add_parser('genes')
 
     prs.add_argument('-al',
@@ -157,6 +160,9 @@ def main():
                 }
 
         cnt = ut.read_file(args.count_data)
+
+        if args.transpose:
+            cnt = cnt.T
 
         cd = Data[args.array](cnt,eps = 0.2,normalize = False)
 

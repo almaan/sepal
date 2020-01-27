@@ -51,6 +51,7 @@ def read_file(pth : str,
     df = pd.read_csv(pth,
                      sep = '\t',
                      header = 0,
+                     engine = 'c',
                      index_col = index_col,
                      )
     return df
@@ -68,11 +69,12 @@ def filter_genes(mat,
                             for x in mat.columns]).astype(int)
 
     mat = mat.iloc[:,keep_genes.astype(bool)]
+
     return mat
 
 def propagate(cd : m.CountData,
-              thrs : float = 1e-7,
-              dt : float = 0.1,
+              thrs : float = 1e-8,
+              dt : float = 0.001,
               stopafter : int = 10e10,
               normalize : bool = True,
               diffusion_rate : int = 1,
@@ -104,11 +106,14 @@ def propagate(cd : m.CountData,
         ncnt = cd.cnt.values
 
         #used means for good res
-        rowSums = np.mean(ncnt,axis = 1).reshape(-1,1)
 
-        ncnt = np.divide(ncnt,rowSums,where = rowSums > 0)
+        # rowSums = np.mean(ncnt,axis = 1).reshape(-1,1)
 
-        colMax = np.max(ncnt,axis = 0).reshape(1,-1)
+        # ncnt = np.divide(ncnt,rowSums,where = rowSums > 0)
+
+        ncnt = np.log2(ncnt + 2) 
+
+        colMax = np.max(np.abs(ncnt),axis = 0).reshape(1,-1)
 
         ncnt = np.divide(ncnt,
                          colMax,where = colMax > 0)
@@ -118,15 +123,19 @@ def propagate(cd : m.CountData,
     else:
         ncnt = cd.cnt.values.astype(float)
 
+
     # get neighbour index
-    nidx = cd.get_allnbr_idx(cd.saturated)
+    snidx = cd.get_satnbr_idx(cd.saturated)
+    unidx = cd.get_unsatnbr_idx(cd.unsaturated)
+
     # Propagate in time
     iterable = tqdm(range(cd.G))
 
     times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
                                                  ncnt[:,gene],
                                                  cd,
-                                                 nidx,
+                                                 snidx,
+                                                 unidx,
                                                  **diff_prop) for \
                                          gene in iterable)
     times = np.array(times)
@@ -137,7 +146,8 @@ def propagate(cd : m.CountData,
 def stepping(gene : int,
              conc : np.ndarray,
              cd : m.CountData,
-             nidx : np.ndarray,
+             snidx : np.ndarray,
+             unidx : np.ndarray,
              thrs : float,
              D : float,
              dt : float,
@@ -148,8 +158,7 @@ def stepping(gene : int,
         time  = 0
 
         old_maxDelta = 1
-        dcdt = 0
-        
+
         while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
@@ -163,15 +172,20 @@ def stepping(gene : int,
             time +=dt
 
             d2 = cd.laplacian(conc[cd.saturated],
-                              conc[nidx],
+                              conc[snidx],
                               cd.h[cd.saturated])
 
-            dcdt = D*d2 
+            dcdt = np.zeros(conc.shape[0])
+            
+            dcdt[cd.saturated] = D*d2
+            dcdt[cd.unsaturated] = dcdt[cd.unsaturated]
 
-            conc[cd.saturated] += dcdt*dt 
+            conc[cd.saturated] += dcdt[cd.saturated]*dt
+            conc[cd.unsaturated] += dcdt[cd.unsaturated]*dt 
+
             conc[conc < 0] = 0
 
-            maxDelta = np.max(np.abs(dcdt)) 
+            maxDelta = entropy(conc[cd.saturated]) / cd.saturated.shape[0]
 
         return time
 
@@ -191,10 +205,10 @@ def visualize_genes(cnt : m.CountData,
                     ncols : int = 5,
                     side_size : float = 3,
                     qscale : float = None ,
+                    log : bool = True,
                     normalize : bool = False,
                     pltargs : dict = None,
                     ) -> Tuple:
-
 
     if normalize:
         rowsums = np.sum(cnt.values,axis = 1).reshape(-1,1)
@@ -226,19 +240,22 @@ def visualize_genes(cnt : m.CountData,
 
     for ii in range(n_genes):
         vals = ncnt[:,ii].reshape(-1,)
+        if log:
+            vals = np.log2(vals + 2)
         if qscale is not None:
             if qscale > 0 and qscale < 1:
-                vals_q = np.quantile(vals,qscale)
+                vals_q = np.quantile(vals,qscale,interpolation = 'nearest')
                 vals[vals > vals_q] = vals_q
             else:
                 print('WARNING : {} is not a proper quantile value'.format(qscale),
                       'within range (0,1)')
 
-        ax[ii].set_title('Gene : {} \nPotential : {:0.3f}'.format(cnt.columns[ii],
+        ax[ii].set_title('Gene : {} \nDiffusion Time : {:0.3f}'.format(cnt.columns[ii],
                                                                   times[ii]))
-        ax[ii].scatter(crd[:,0],
-                       crd[:,1],
-                       c = vals,
+        high_ordr = np.argsort(vals)
+        ax[ii].scatter(crd[:,0][high_ordr],
+                       crd[:,1][high_ordr],
+                       c = vals[high_ordr],
                        **_pltargs,
                       )
         clean_axes(ax[ii])
@@ -274,9 +291,10 @@ def get_eigen( mat : np.ndarray,
     # matrix is n_spots x n_genes
     x_hat = mat.T
     # now n_genes x n_spots
-    mu = x_hat.mean(axis=0).reshape(1,-1)
-    std = x_hat.std(axis = 0).reshape(1,-1)
-    x_hat = ( x_hat - mu ) / std
+    mu = np.mean(x_hat,axis=0, keepdims = True)
+    
+    x_hat = (x_hat - mu)
+    x_hat[np.isnan(x_hat)] = 0
 
     cov = np.cov(x_hat, rowvar = False)
 
@@ -315,15 +333,15 @@ def cluster_data(counts : np.ndarray,
 
     print("[INFO] : Using {} eigenpatterns".format(n_patterns))
 
-    cidx = Cl(metric = 'precomputed',
-              max_eps = np.inf,
-              xi = 0.01,
-              min_samples = 2).fit_predict(get_eigen_dmat(projs))
+    # cidx = Cl(metric = 'precomputed',
+    #           max_eps = np.inf,
+    #           xi = 0.01,
+    #           min_samples = 2).fit_predict(get_eigen_dmat(projs))
 
-    # cidx = ACl(n_clusters = n_patterns,
-    #            affinity = 'precomputed',
-    #            linkage = 'complete',
-    #            ).fit_predict(get_eigen_dmat(projs))
+    cidx = ACl(n_clusters = n_patterns,
+               affinity = 'precomputed',
+               linkage = 'complete',
+               ).fit_predict(get_eigen_dmat(projs))
 
 
     n_clusters = np.unique(cidx)
@@ -339,6 +357,7 @@ def visualize_clusters(counts : np.ndarray,
                        crd : np.ndarray,
                        labels : np.ndarray,
                        ncols : int,
+                       log : bool = True,
                        side_size : float = 3,
                        pltargs : dict = None,
                        normalize : bool = True,
@@ -377,10 +396,14 @@ def visualize_clusters(counts : np.ndarray,
         vizlist[-1][1] = vizlist[-1][1].flatten()
 
         for ii in range(pos.shape[0]):
+            vals = counts[:,pos[ii]]
+            if log:
+                vals = np.log2(vals + 2)
+
             vizlist[-1][1][ii].set_title("Gene : {}".format(genes[pos[ii]]))
             vizlist[-1][1][ii].scatter(crd[:,0],
                                        crd[:,1],
-                                       c = counts[:,pos[ii]],
+                                       c = vals,
                                        **_pltargs,
                                        )
 
@@ -451,7 +474,7 @@ def toprank(cnt : pd.DataFrame,
 
         cmat = np.array([[ninter,n_examine -ninter,],
                         [n_topexpr - ninter,
-                        cnt.shape[0]-n_examine-n_topexpr+ninter]])
+                        cnt.shape[1]-n_examine-n_topexpr+ninter]])
 
         _,pval = fe(cmat)
 
@@ -483,4 +506,21 @@ def visualize_cdf(diff : np.ndarray,
     return (fig,ax)
 
 
+def entropy(xx):
+    xnz = xx[xx>0]
+    xs = np.sum(xnz)
+    xn = xnz / xs
+    xl = np.log(xn) 
+    return (-xl*xn).sum()
 
+
+def morans(xx,ws):
+    N = xx.shape[0]
+    W = ws.sum()
+    mu = xx.mean()
+
+    den = np.sum((xx - mu)**2)
+    nom = (xx - mu).reshape(-1,1) * (xx -mu ).reshape(1,-1) * ws
+    nom = nom.sum()
+
+    return N / W * nom / den

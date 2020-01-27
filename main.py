@@ -33,7 +33,7 @@ def main():
                      required = False,
                      default = False,
                      action = 'store_true',
-                     help = 'output directory')
+                     help = 'transpose count matrix')
 
     prs.add_argument('-mo','--min_occurance',
                      type = int,
