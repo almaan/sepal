@@ -21,10 +21,12 @@ from scipy.spatial.distance import cdist
 
 from sklearn.cluster import OPTICS as Cl
 from sklearn.cluster import AgglomerativeClustering as ACl
+from sklearn.cluster import KMeans
+from sklearn.metrics import silhouette_score, davies_bouldin_score
 
 from scipy.stats import fisher_exact as fe
 
-from typing import Tuple
+from typing import Tuple,Dict
 
 from tqdm import tqdm
 
@@ -116,7 +118,8 @@ def propagate(cd : m.CountData,
         colMax = np.max(np.abs(ncnt),axis = 0).reshape(1,-1)
 
         ncnt = np.divide(ncnt,
-                         colMax,where = colMax > 0)
+                         colMax,
+                         where = colMax > 0)
 
         ncnt = ncnt.astype(float)
 
@@ -181,7 +184,8 @@ def stepping(gene : int,
             dcdt[cd.unsaturated] = dcdt[cd.unsaturated]
 
             conc[cd.saturated] += dcdt[cd.saturated]*dt
-            conc[cd.unsaturated] += dcdt[cd.unsaturated]*dt 
+            # conc[cd.unsaturated] += dcdt[cd.unsaturated]
+            conc[cd.unsaturated] += dcdt[unidx]*dt 
 
             conc[conc < 0] = 0
 
@@ -206,15 +210,10 @@ def visualize_genes(cnt : m.CountData,
                     side_size : float = 3,
                     qscale : float = None ,
                     log : bool = True,
-                    normalize : bool = False,
                     pltargs : dict = None,
                     ) -> Tuple:
 
-    if normalize:
-        rowsums = np.sum(cnt.values,axis = 1).reshape(-1,1)
-        ncnt = np.divide(cnt.values,rowsums,where = rowsums > 0)
-    else:
-        ncnt = cnt.values
+    ncnt = cnt.values
 
     n_genes = cnt.shape[1]
     nrows = np.ceil(n_genes / ncols).astype(int)
@@ -290,14 +289,20 @@ def get_eigen( mat : np.ndarray,
 
     # matrix is n_spots x n_genes
     x_hat = mat.T
-    # now n_genes x n_spots
+
+    # x_hat is n_genes x n_spots
+    # rows are variables
+    # columns are samples
+
+    # center the variables
     mu = np.mean(x_hat,axis=0, keepdims = True)
-    
     x_hat = (x_hat - mu)
     x_hat[np.isnan(x_hat)] = 0
 
+    # get covariance matrix
     cov = np.cov(x_hat, rowvar = False)
 
+    # compute eigencomps
     evals,evecs = np.linalg.eigh(cov)
 
     idx = np.argsort(evals)[::-1]
@@ -311,8 +316,8 @@ def get_eigen( mat : np.ndarray,
     n_comps = np.argmax( cs / cs[-1] > thrs)
 
     evecs = evecs[:,0:n_comps+1]
-
-    proj = np.dot(x_hat,evecs)
+    evecs /= np.linalg.norm(evecs,axis = 0)
+    proj = np.dot(mat.T,evecs)
 
     return (evecs,proj)
 
@@ -326,12 +331,12 @@ def cluster_data(counts : np.ndarray,
                             thrs = threshold)
 
     projs = projs[0:n_projs,:]
-
     projs /=  np.linalg.norm(projs,axis = 1).reshape(-1,1)
 
     n_patterns = epats.shape[1]
 
     print("[INFO] : Using {} eigenpatterns".format(n_patterns))
+
 
     # cidx = Cl(metric = 'precomputed',
     #           max_eps = np.inf,
@@ -339,19 +344,72 @@ def cluster_data(counts : np.ndarray,
     #           min_samples = 2).fit_predict(get_eigen_dmat(projs))
 
     cidx = ACl(n_clusters = n_patterns,
-               affinity = 'precomputed',
-               linkage = 'complete',
-               ).fit_predict(get_eigen_dmat(projs))
-
+            affinity = 'precomputed',
+            linkage = 'complete',
+            ).fit_predict(get_eigen_dmat(projs))
 
     n_clusters = np.unique(cidx)
     n_clusters = n_clusters[n_clusters >= 0]
     n_clusters = n_clusters.shape[0]
 
+    repr_patterns = {} 
+    for cl in np.unique(cidx):
+        av_loads = np.mean(projs[cidx == cl,:],axis = 0)
+        rpat = np.dot(epats,av_loads)
+        repr_patterns.update({cl:rpat})
+
+
     print("[INFO] : Identified {} clusters".format(n_clusters))
 
-    return cidx
- 
+    return (cidx,repr_patterns)
+
+def visualize_representative(patterns : Dict[int,np.ndarray],
+                             crd : np.ndarray,
+                             ncols : int,
+                             log : bool = True,
+                             side_size : float = 3,
+                             pltargs : dict = None,
+                             normalize : bool = True,
+                             ):
+
+    nrows = np.ceil(len(patterns) / ncols).astype(int)
+
+    _pltargs = {'s':40,
+                'edgecolor':'black',
+                'cmap':plt.cm.PuRd,
+                }
+
+    if pltargs is not None:
+        for k,v in pltargs.items():
+            _pltargs[k] = v
+            if k == 'cmap' and isinstance(k,str):
+                _pltargs[k] = eval(v)
+
+    figsize = (1.2 * ncols * side_size,
+               1.2 * nrows * side_size)
+
+    fig,ax = plt.subplots(nrows,
+                          ncols,
+                          figsize = figsize)
+    ax = ax.flatten()
+
+    for cl,vals in patterns.items():
+        if log:
+            vals = np.log2(vals + 2)
+
+        ax[cl].scatter(crd[:,0],
+                       crd[:,1],
+                       c = vals,
+                       **_pltargs,
+                       )
+        ax[cl].set_title("Repr. Pattern {}".format(cl))
+
+    for ii in range(ax.shape[0]):
+        ax[ii] = clean_axes(ax[ii])
+
+    return fig,ax
+
+
 def visualize_clusters(counts : np.ndarray,
                        genes : pd.Index,
                        crd : np.ndarray,
@@ -391,7 +449,7 @@ def visualize_clusters(counts : np.ndarray,
                                          ncols,
                                          figsize = figsize)))
 
-        vizlist[-1][0].suptitle("Eigengroup {}".format(lab))
+        vizlist[-1][0].suptitle("Family {}".format(lab))
 
         vizlist[-1][1] = vizlist[-1][1].flatten()
 

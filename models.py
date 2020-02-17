@@ -22,6 +22,7 @@ class CountData(ABC):
 
         self.cnt = cnt
         self.crd = self.get_crd(cnt.index)
+
         self.real_crd = self.get_crd(cnt.index)
 
         self._format_crd()

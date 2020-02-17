@@ -42,15 +42,15 @@ def make_pattern(x_dim,y_dim):
     U = np.random.random((y_dim,x_dim))
     V = np.random.random((y_dim,x_dim))
 
-    n_steps = 10000
+    n_steps = 1000
     dt = 0.01
 
- .   prms1 = dict(a = 0.1,
-                Du = 0.1,
-                Dv = 7,
-                beta = 0.25,
-                delta = 0.2,
-                )
+    prms1 = dict(a = 0.1,
+                 Du = 0.1,
+                 Dv = 7,
+                 beta = 0.25,
+                 delta = 0.2,
+                 )
 
     prms2 = dict(a = 0.1,
                 Du = 0.1,
@@ -58,6 +58,22 @@ def make_pattern(x_dim,y_dim):
                 beta = 0.25,
                 delta = 0.2,
                 )
+
+    prms3 = dict(a = 0.1,
+                    Du = 0.1,
+                    Dv = 5,
+                    beta = 0.15,
+                    delta = 0.8,
+                    )
+
+    prms4 = dict(a = 0.1,
+                    Du = 0.1,
+                    Dv = 4,
+                    beta = 0.15,
+                    delta = 0.3,
+                    )
+
+
 
 
     for i in range(n_steps):
@@ -127,4 +143,4 @@ crd = np.array( [x.split('x') for x in matrix.index] ).astype(float)
 plt.scatter(crd[:,0],crd[:,1],c = matrix.values[:,10],s = 80)
 plt.show()
 
-matrix.to_csv("/tmp/turing-test-2.tsv",sep = '\t',header =True, index = True)
+matrix.to_csv("/tmp/turing-test-5.tsv",sep = '\t',header =True, index = True)

@@ -46,6 +46,11 @@ def main():
                      action = 'store_true',
                      help = 'transpose count matrix')
 
+    prs.add_argument('-rt','--rotate',
+                     default = False,
+                     action = 'store_true',
+                     )
+
     # gene_prs = sub_prs.add_parser('genes')
 
     prs.add_argument('-al',
@@ -129,6 +134,7 @@ def main():
                          help = 'quantile to use for quantile scaling',
                          )
 
+    
 
 
     args = prs.parse_args()
@@ -164,7 +170,11 @@ def main():
         if args.transpose:
             cnt = cnt.T
 
-        cd = Data[args.array](cnt,eps = 0.2,normalize = False)
+        print(args.rotate)
+        cd = Data[args.array](cnt,
+                              eps = 0.2,
+                              normalize = False,
+                              )
 
 
 
@@ -205,7 +215,7 @@ def main():
         cluster_genes = times_all.index.values[sort_genes]
 
         args.threshold = np.clip(args.threshold,0,1)
-        cluster_labels = ut.cluster_data(cd.cnt.loc[:,cluster_genes].values,
+        cluster_labels,repr_patterns = ut.cluster_data(cd.cnt.loc[:,cluster_genes].values,
                                          n_base = args.cluster_base,
                                          n_projs = args.cluster_genes,
                                          threshold = args.threshold,
@@ -227,6 +237,21 @@ def main():
                         )
 
         if args.modules is not None and 'plot' in args.modules:
+
+            reprviz,_ = ut.visualize_representative(repr_patterns,
+                                                   crd = cd.real_crd,
+                                                   ncols = args.n_cols,
+                                                   pltargs = args.style_dict,
+                                                   )
+
+            reproname = osp.join(args.out_dir,''.join([sampletag,
+                                                       '-representative.png',
+                                                       ],
+                                                       ))
+            reprviz.savefig(reproname)
+
+
+
             clusterviz = ut.visualize_clusters(cd.cnt.loc[:,cluster_genes[0:args.cluster_genes]].values,
                                                genes = cluster_genes[0:args.cluster_genes],
                                                crd = cd.real_crd,
@@ -242,6 +267,8 @@ def main():
                                                             '.png'],
                                                                 ))
                 clusterviz[cl][0].savefig(clustoname)
+
+
 
     if 'enrich' in args.analysis:
         if args.cluster_labels is not None:
