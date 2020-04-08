@@ -14,6 +14,8 @@ import utils as ut
 import models as m
 from datasets import RawData
 
+from argparse import Namespace as ARGS
+
 
 
 class SettingVars:
@@ -22,10 +24,16 @@ class SettingVars:
         self.SEL_COLUMN = 'average'
         self.PVAL_EPS = 1e-273
 
-def enrich(args):
+def enrich(args : ARGS,
+           )->None:
     return None
 
-def family(times_all,cd,sampletag,args):
+def family(times_all :pd.DataFrame,
+           cd : m.CountData,
+           sampletag : str,
+           args : ARGS,
+           )->None:
+
     st = SettingVars()
     sort_genes = np.argsort(times_all[st.SEL_COLUMN].values)[::-1]
 
@@ -37,37 +45,48 @@ def family(times_all,cd,sampletag,args):
                                     times_all.shape[0]))
 
 
-    cluster_genes = times_all.index.values[sort_genes]
+    use_genes = times_all.index.values[sort_genes]
 
     args.threshold = np.clip(args.threshold,0,1)
-    cluster_labels,repr_patterns = ut.cluster_data(cd.cnt.loc[:,cluster_genes].values,
+    family_labels,repr_patterns = ut.get_families(cd.cnt.loc[:,use_genes].values,
                                     n_base = args.n_base_genes,
-                                    n_projs = args.n_genes,
+                                    n_sort = args.n_genes,
                                     threshold = args.threshold,
                                     )
 
-    clusters = pd.DataFrame(cluster_labels,
-                            index = cluster_genes[0:args.n_genes],
+    families = pd.DataFrame(family_labels,
+                            index = use_genes[0:args.n_genes],
                             columns = ['family'],
                             )
 
-    out_cl_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
+    out_fl_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
                                                             'family',
                                                             'index.tsv']
                                                             ))
-    clusters.to_csv(out_cl_pth,
+    families.to_csv(out_fl_pth,
                     sep = '\t',
                     header = True,
                     index = True,
                     )
 
+    out_repr = pd.DataFrame(repr_patterns)
+    out_repr.index = cd.cnt.index
+
+    out_repr.to_csv(osp.join(args.out_dir,
+                             sampletag + "-representative" +\
+                             ".tsv"),
+                             header = True,
+                             index = True,
+                             sep = '\t'
+                             )
+
     if args.plot:
 
-        reprviz,_ = ut.visualize_representative(repr_patterns,
-                                                crd = cd.real_crd,
-                                                ncols = args.n_cols,
-                                                pltargs = args.style_dict,
-                                                )
+        reprviz,_ = ut.plot_representative(repr_patterns,
+                                           crd = cd.real_crd,
+                                           ncols = args.n_cols,
+                                           pltargs = args.style_dict,
+                                           )
 
         reproname = osp.join(args.out_dir,''.join([sampletag,
                                                     '-representative.png',
@@ -75,22 +94,22 @@ def family(times_all,cd,sampletag,args):
                                                     ))
         reprviz.savefig(reproname)
 
-        clusterviz = ut.visualize_clusters(cd.cnt.loc[:,cluster_genes[0:args.n_genes]].values,
-                                            genes = cluster_genes[0:args.n_genes],
-                                            crd = cd.real_crd,
-                                            labels = cluster_labels,
-                                            ncols = args.n_cols,
-                                            pltargs = args.style_dict,
-                                            split_title = args.split_title,
-                                            )
+        family_plots = ut.plot_families(cd.cnt.loc[:,use_genes[0:args.n_genes]].values,
+                                        genes = use_genes[0:args.n_genes],
+                                        crd = cd.real_crd,
+                                        labels = family_labels,
+                                        ncols = args.n_cols,
+                                        pltargs = args.style_dict,
+                                        split_title = args.split_title,
+                                        )
 
-        for cl in range(len(clusterviz)):
-            clustoname = osp.join(args.out_dir,''.join([sampletag,
-                                                            '-family-',
-                                                                str(cl),
-                                                            '.png'],
-                                                                ))
-            clusterviz[cl][0].savefig(clustoname)
+        for fl in range(len(family_plots)):
+            famoname = osp.join(args.out_dir,''.join([sampletag,
+                                                      '-family-',
+                                                       str(fl),
+                                                       '.png'],
+                                                        ))
+            family_plots[fl][0].savefig(famoname)
 
     return None
 
