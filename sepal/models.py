@@ -2,6 +2,7 @@
 
 import numpy as np
 import pandas as pd
+import os.path as osp
 
 from abc import ABC,abstractmethod, abstractproperty
 from scipy.spatial import KDTree
@@ -12,18 +13,20 @@ import matplotlib.pyplot as plt
 
 from typing import Tuple
 
+from datasets import RawData
+
 class CountData(ABC):
     def __init__(self,
-                 cnt : pd.DataFrame,
+                 data : RawData,
                  normalize : bool = True, 
                  eps : float = 0.1,
                  )-> None:
 
 
-        self.cnt = cnt
-        self.crd = self.get_crd(cnt.index)
+        self.cnt = data.cnt
+        self.crd = data.crd
 
-        self.real_crd = self.get_crd(cnt.index)
+        self.real_crd = data.crd
 
         self._format_crd()
         self._update_specs()
@@ -368,4 +371,124 @@ def laplacian_hex(centers : np.ndarray,
     return d2f
 
 
+def propagate(cd : m.CountData,
+              thrs : float = 1e-8,
+              dt : float = 0.001,
+              stopafter : int = 10e10,
+              normalize : bool = True,
+              diffusion_rate : int = 1,
+              num_workers : int = None,
+              )-> np.ndarray:
+
+    if num_workers is None:
+        num_workers = int(cpu_count())
+    else:
+        num_workers = min(num_workers,
+                          cpu_count())
+
+    print("[INFO] : Using {} workers".format(num_workers))
+
+    diff_prop = {'D':diffusion_rate,
+                 'thrs':thrs,
+                 'dt':dt,
+                 'stopafter':stopafter}
+
+    n_saturated = cd.saturated.shape[0]
+    if n_saturated < 1:
+        print("[ERROR] : No Saturated spots")
+        sys.exit(-1)
+    else:
+        print("[INFO] : {} Saturated Spots".format(n_saturated))
+
+    if normalize:
+
+        ncnt = cd.cnt.values
+
+        ncnt = ut.normalize_expression(ncnt)
+
+        colMax = np.max(np.abs(ncnt),axis = 0).reshape(1,-1)
+
+        ncnt = np.divide(ncnt,
+                         colMax,
+                         where = colMax > 0)
+
+        ncnt = ncnt.astype(float)
+
+    else:
+        ncnt = cd.cnt.values.astype(float)
+
+
+    # get neighbour index
+    snidx = cd.get_satnbr_idx(cd.saturated)
+    unidx = cd.get_unsatnbr_idx(cd.unsaturated)
+
+    # Propagate in time
+    iterable = tqdm(range(cd.G))
+
+    times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
+                                                 ncnt[:,gene],
+                                                 cd,
+                                                 snidx,
+                                                 unidx,
+                                                 **diff_prop) for \
+                                         gene in iterable)
+    times = np.array(times)
+
+    return times
+
+
+def stepping(gene : int,
+             conc : np.ndarray,
+             cd : m.CountData,
+             snidx : np.ndarray,
+             unidx : np.ndarray,
+             thrs : float,
+             D : Union[float,np.ndarray],
+             dt : float,
+             stopafter : int,
+             )->float:
+
+        maxDelta = np.inf
+        time  = 0
+
+        old_maxDelta = 1
+
+        while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
+            if time / dt > stopafter:
+                genename = cd.cnt.columns[gene]
+                print("WARNING : Gene :"
+                      "{} did not converge"
+                      "".format(genename))
+                break
+
+            old_maxDelta = maxDelta
+
+            time +=dt
+
+            d2 = cd.laplacian(conc[cd.saturated],
+                              conc[snidx],
+                              cd.h[cd.saturated])
+
+            dcdt = np.zeros(conc.shape[0])
+
+            dcdt[cd.saturated] = D*d2
+            dcdt[cd.unsaturated] = dcdt[cd.unsaturated]
+
+            conc[cd.saturated] += dcdt[cd.saturated]*dt
+            # conc[cd.unsaturated] += dcdt[cd.unsaturated]
+            conc[cd.unsaturated] += dcdt[unidx]*dt
+
+            conc[conc < 0] = 0
+
+            maxDelta = entropy(conc[cd.saturated]) / cd.saturated.shape[0]
+
+        return time
+
+
+def entropy(xx):
+    xnz = xx[xx>0]
+    xs = np.sum(xnz)
+    xn = xnz / xs
+    xl = np.log(xn)
+    return (-xl*xn).sum()
 
