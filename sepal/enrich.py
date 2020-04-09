@@ -158,4 +158,10 @@ def main(args : ARGS,
         lopth = opth.replace(".tsv","-latex.txt")
         with open(lopth,"w+") as f:
             f.write(enr.to_latex())
+
+    if args.markdown:
+        mopth = opth.replace(".tsv","-markdown.md")
+        with open(mopth,"w+") as f:
+            f.write(enr.to_markdown())
+
     return None

@@ -24,6 +24,84 @@ from sepal.utils import iprint,eprint,wprint,VARS
 import sepal.utils as ut
 import sepal.models as m
 
+def plot_representative(motifs : Dict[int,np.ndarray],
+                        crd : np.ndarray,
+                        ncols : int,
+                        side_size : float = 300,
+                        pltargs : dict = None,
+                        normalize : bool = False ,
+                        )->Tuple[plt.Figure,plt.Axes]:
+
+    """Plot representative motifs
+
+    Parameters:
+    ----------
+
+    motifs : Dict[int,np.ndarray]
+        motif index and profile for respective
+        family
+    crd : np.ndarray
+        coordinates to use. [n_locations x 2]
+    ncols : int
+        number of columns to use
+    side_size : float
+        side size of each subplot.
+        Given in pixels
+    pltargs : dict
+        style dict for plot
+    normalize : bool
+        normalize motif expression. Strongly
+        avoided since negative values may
+        be present.
+
+    Returns
+    -------
+    Tuple with figure and
+    axes objects
+
+    
+    """
+
+    side_size *= 0.01
+
+    # determine number of rows
+    nrows = np.ceil(len(motifs) / ncols).astype(int)
+
+    _pltargs = VARS.PLTARGS
+
+    if pltargs is not None:
+        for k,v in pltargs.items():
+            _pltargs[k] = v
+            if k == 'cmap' and isinstance(k,str):
+                try:
+                    _pltargs[k] = eval("plt.cm." + v)
+                except:
+                    _pltargs[k] = plt.cm.magma
+
+    figsize = (1.2 * ncols * side_size,
+               1.2 * nrows * side_size)
+
+    fig,ax = plt.subplots(nrows,
+                          ncols,
+                          figsize = figsize)
+    ax = ax.flatten()
+
+    for fl,vals in motifs.items():
+        if normalize:
+            vals = ut.normalize_expression(vals)
+
+        ax[fl].scatter(crd[:,0],
+                       crd[:,1],
+                       c = vals,
+                       **_pltargs,
+                       )
+        ax[fl].set_title("Repr. Motif {}".format(fl))
+
+    for ii in range(ax.shape[0]):
+        ut.clean_axes(ax[ii])
+
+    return fig,ax
+
 
 
 def plot_families(counts : np.ndarray,
@@ -90,7 +168,7 @@ def plot_families(counts : np.ndarray,
         for k,v in pltargs.items():
             _pltargs[k] = v
             if k == 'cmap' and isinstance(k,str):
-                _pltargs[k] = eval(v)
+                _pltargs[k] = eval("plt.cm."+ v)
 
 
     # generate visualizations for
@@ -398,7 +476,7 @@ def main(times_all :pd.DataFrame,
     # visualize results if specified
     if args.plot:
 
-        reprviz,_ = ut.plot_representative(repr_patterns,
+        reprviz,_ = plot_representative(repr_patterns,
                                            crd = cd.real_crd,
                                            ncols = args.n_cols,
                                            pltargs = args.style_dict,
@@ -410,15 +488,15 @@ def main(times_all :pd.DataFrame,
                                                     ))
         reprviz.savefig(reproname)
 
-        family_plots = ut.plot_families(cd.cnt.loc[:,use_genes[0:args.n_genes]].values,
-                                        genes = use_genes[0:args.n_genes],
-                                        crd = cd.real_crd,
-                                        labels = family_labels,
-                                        ncols = args.n_cols,
-                                        pltargs = args.style_dict,
-                                        split_title = args.split_title,
-                                        side_size = args.side_size,
-                                        )
+        family_plots = plot_families(cd.cnt.loc[:,use_genes[0:args.n_genes]].values,
+                                     genes = use_genes[0:args.n_genes],
+                                     crd = cd.real_crd,
+                                     labels = family_labels,
+                                     ncols = args.n_cols,
+                                     pltargs = args.style_dict,
+                                     split_title = args.split_title,
+                                     side_size = args.side_size,
+                                      )
 
         for fl in range(len(family_plots)):
             famoname = osp.join(args.out_dir,''.join([sampletag,

@@ -4,7 +4,7 @@ from setuptools import setup
 import os
 import sys
 
-setup(name='Sepal',
+setup(name='sepal',
             version='1.0.0',
             description='Identification of Spatial Patterns By Diffusion Modelling',
             url='http://github.com/almaan/sepal',

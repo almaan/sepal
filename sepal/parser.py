@@ -251,6 +251,11 @@ def make_parser():
                                 type = json.loads,
                                 help = 'plot style as dict',
                                 )
+    family_parser.add_argument('-nc','--n_cols',
+                                type = int,
+                                default = 5,
+                                help = 'number f columns in plot')
+
 
     enrich_parser.add_argument('-fl','--family_index',
                                 required = True,
@@ -268,9 +273,10 @@ def make_parser():
                                " organisms",
                                )
 
+
     enrich_parser.add_argument("-dbs","--databases",
                      nargs = '+',
-                     default = ["GP:BP"],
+                     default = ["GO:BP"],
                      help = ('database to use in enrichment'
                              ' analysis'))
 
@@ -279,6 +285,12 @@ def make_parser():
                                 action = 'store_true',
                                 help = "save latex formatted table",
                                )
+    enrich_parser.add_argument("-md","--markdown",
+                                default = False,
+                                action = 'store_true',
+                                help = "save markdown formatted table",
+                               )
+
 
 
     return parser

@@ -10,7 +10,7 @@ in sepal
 import re
 import datetime
 
-import sepal.__init__
+from sepal.__init__ import __version__
 
 import time as Time
 import re
@@ -52,6 +52,11 @@ class VARS:
     """default variables"""
     SEL_COLUMN = 'average'
     PVAL_EPS = 1e-273
+    PLTARGS = {'s':80,
+                'edgecolor':'none',
+                'cmap':plt.cm.magma,
+                }
+
 
 
 
@@ -245,7 +250,7 @@ def plot_profiles(cnt : pd.DataFrame,
                     qscale : float = None ,
                     normalize : bool = True,
                     pltargs : dict = None,
-                    split_title : list = Tuple[str,int],
+                    split_title : Tuple[str,int] = None,
                     pval : bool = False,
                     ) -> Tuple[plt.Figure,plt.Axes]:
 
@@ -322,8 +327,8 @@ def plot_profiles(cnt : pd.DataFrame,
     ax = ax.flatten()
 
     # define plot aesthetics
-    _pltargs = {'s':40,
-                'edgecolor':'black',
+    _pltargs = {'s':80,
+                'edgecolor':'none',
                 'cmap':plt.cm.magma,
                 }
 
@@ -406,86 +411,86 @@ def plot_profiles(cnt : pd.DataFrame,
 
     return (fig,ax)
 
-def plot_representative(motifs : Dict[int,np.ndarray],
-                        crd : np.ndarray,
-                        ncols : int,
-                        side_size : float = 300,
-                        pltargs : dict = None,
-                        normalize : bool = True,
-                        )->Tuple[plt.Figure,plt.Axes]:
+# def plot_representative(motifs : Dict[int,np.ndarray],
+#                         crd : np.ndarray,
+#                         ncols : int,
+#                         side_size : float = 300,
+#                         pltargs : dict = None,
+#                         normalize : bool = True,
+#                         )->Tuple[plt.Figure,plt.Axes]:
 
-    """Plot representative motifs
+#     """Plot representative motifs
 
-    Parameters:
-    ----------
+#     Parameters:
+#     ----------
 
-    motifs : Dict[int,np.ndarray]
-        motif index and profile for respective
-        family
-    crd : np.ndarray
-        coordinates to use. [n_locations x 2]
-    ncols : int
-        number of columns to use
-    side_size : float
-        side size of each subplot.
-        Given in pixels
-    pltargs : dict
-        style dict for plot
-    normalize : bool
-        normalize motif expression. Strongly
-        avoided since negative values may
-        be present.
+#     motifs : Dict[int,np.ndarray]
+#         motif index and profile for respective
+#         family
+#     crd : np.ndarray
+#         coordinates to use. [n_locations x 2]
+#     ncols : int
+#         number of columns to use
+#     side_size : float
+#         side size of each subplot.
+#         Given in pixels
+#     pltargs : dict
+#         style dict for plot
+#     normalize : bool
+#         normalize motif expression. Strongly
+#         avoided since negative values may
+#         be present.
 
-    Returns
-    -------
-    Tuple with figure and
-    axes objects
+#     Returns
+#     -------
+#     Tuple with figure and
+#     axes objects
 
     
-    """
+#     """
 
-    side_size *= 0.01
+#     side_size *= 0.01
 
-    # determine number of rows
-    nrows = np.ceil(len(motifs) / ncols).astype(int)
+#     # determine number of rows
+#     nrows = np.ceil(len(motifs) / ncols).astype(int)
 
-    _pltargs = {'s':40,
-                'edgecolor':'black',
-                'cmap':plt.cm.PuRd,
-                }
+#     _pltargs = {'s':40,
+#                 'edgecolor':'black',
+#                 'cmap':plt.cm.PuRd,
+#                 }
 
-    if pltargs is not None:
-        for k,v in pltargs.items():
-            _pltargs[k] = v
-            if k == 'cmap' and isinstance(k,str):
-                try:
-                    _pltargs[k] = eval("plt.cm." + v)
-                except:
-                    _pltargs[k] = plt.cm.magma
+#     if pltargs is not None:
+#         for k,v in pltargs.items():
+#             _pltargs[k] = v
+#             if k == 'cmap' and isinstance(k,str):
+#                 try:
+#                     _pltargs[k] = eval("plt.cm." + v)
+#                 except:
+#                     _pltargs[k] = plt.cm.magma
 
-    figsize = (1.2 * ncols * side_size,
-               1.2 * nrows * side_size)
+#     figsize = (1.2 * ncols * side_size,
+#                1.2 * nrows * side_size)
 
-    fig,ax = plt.subplots(nrows,
-                          ncols,
-                          figsize = figsize)
-    ax = ax.flatten()
+#     fig,ax = plt.subplots(nrows,
+#                           ncols,
+#                           figsize = figsize)
+#     ax = ax.flatten()
 
-    for fl,vals in motifs.items():
-        if normalize:
-            vals = normalize_expression(vals)
+#     for fl,vals in motifs.items():
+#         if normalize:
+#             vals = normalize_expression(vals)
 
-        ax[fl].scatter(crd[:,0],
-                       crd[:,1],
-                       c = vals,
-                       **_pltargs,
-                       )
-        ax[fl].set_title("Repr. Motif {}".format(fl))
+#         ax[fl].scatter(crd[:,0],
+#                        crd[:,1],
+#                        c = vals,
+#                        **_pltargs,
+#                        )
+#         ax[fl].set_title("Repr. Motif {}".format(fl))
 
-    for ii in range(ax.shape[0]):
-        clean_axes(ax[ii])
+#     for ii in range(ax.shape[0]):
+#         clean_axes(ax[ii])
 
-    return fig,ax
+#     return fig,ax
 
 
 def timestamp() -> str:
@@ -501,8 +506,7 @@ def banner()->None:
           "┌─┐┌─┐┌─┐┌─┐┬     '/_\\'  \n"\
           "└─┐├┤ ├─┘├─┤│     \ | /  \n"\
           "└─┘└─┘┴  ┴ ┴┴─┘    \|/   "
-    # print("\n")
-    v = "Version {} |  see https://github.com/almaan/sepal".format(__init__.__version__)
+    v = "Version {} |  see https://github.com/almaan/sepal".format(__version__)
     print( logo + "\n" + v)
 
 

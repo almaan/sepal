@@ -2,7 +2,7 @@
 
 This repo contains:
 * the sepal python package, and installation files
-* tutorials and examples of usage (CLI and API)
+* tutorials and examples of usage (CLI and as a imported package)
 * data used in the publication
 * results presented in the publication
 
@@ -37,7 +37,7 @@ To test and see whether the installation was successful you could try executing 
 sepal -h
 
 ```
-Which should print the help message associated with sepal. If everyhing wored out for you so far,
+Which should print the help message associated with sepal. If everything worked out for you so far,
 you may proceed to the example section to see `sepal` in action!
 
 ## Examples
@@ -52,7 +52,7 @@ can easily be performed by typing `sepal` followed by
 either `run` or `analyze`. The `analyze` module have different
 options, to visualize the results (`inspect`),
 sort the profiles into pattern families (`family`) or subject 
-the identified families to functional enrichment analysis. For a 
+the identified families to functional enrichment analysis (`fea`). For a 
 complete list of commands available, do  `sepal module -h`, where module
 is one of `run` and `analyze`. Below, we illustrate
 how sepal may be used to find transcription profiles with spatial patterns.

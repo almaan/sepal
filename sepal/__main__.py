@@ -10,6 +10,9 @@ from sepal.utils import banner
 import warnings
 
 def main()->None:
+    banner()
+    warnings.filterwarnings("ignore",
+                            category=FutureWarning)
     prs = parser.make_parser()
     args = prs.parse_args()
     if args.command == 'run':
@@ -23,9 +26,6 @@ def main()->None:
               )
 
 if __name__ == "__main__":
-    banner()
-    warnings.filterwarnings("ignore",
-                            category=FutureWarning)
     try:
         main()
     except KeyboardInterrupt:

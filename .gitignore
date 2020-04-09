@@ -9,4 +9,5 @@ build/
 dist/
 process/
 res/*/genes/
+res/example/
 

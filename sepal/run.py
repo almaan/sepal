@@ -97,13 +97,9 @@ def main(args : ARGS,
         times = m.propagate(cd,
                             dt = args.time_step)
 
-        # save results 
-        times_df = pd.DataFrame([str(x) for x in times],
-                              index = cd.cnt.columns,
-                              columns = [sampletags[-1]],
-                              )
+        times.columns = pd.Index([sampletags[-1]])
 
-        times_all.append(times_df)
+        times_all.append(times)
 
     # Min max normalize diffusion times
     times_all = pd.concat(times_all, axis = 1, join = 'inner').astype(float)

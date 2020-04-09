@@ -775,7 +775,8 @@ def propagate(cd : CountData,
               normalize : bool = True,
               diffusion_rate : Union[float,np.ndarray] = 1.0,
               num_workers : int = None,
-              )-> np.ndarray:
+              scale : bool = False,
+              )-> pd.DataFrame:
     """Simulate Diffusion
 
     Simulates diffusion by propagating
@@ -803,6 +804,8 @@ def propagate(cd : CountData,
         number of workers to use
         if none is given maximal
         number is used
+    scale : bool
+        do minmax scaling
 
     Returns:
     -------
@@ -811,7 +814,6 @@ def propagate(cd : CountData,
 
     """
 
-    print(cd.nn)
 
     if num_workers is None:
         num_workers = int(cpu_count())
@@ -868,7 +870,19 @@ def propagate(cd : CountData,
                                                  **diff_prop) for \
                                          idx in iterable)
     times = np.array(times)
-
+    if scale:
+        mn = times.min()
+        mx = times.max()
+        scaled = (times - mn) / (mx - mn)
+        times = pd.DataFrame(scaled.reshape(-1,1),
+                             columns = ['average'],
+                             index = cd.cnt.columns,
+                             )
+    else:
+        times = pd.DataFrame(times.reshape(-1,1),
+                             columns = ['average'],
+                             index = cd.cnt.columns,
+                             )
     return times
 
 
