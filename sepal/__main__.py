@@ -2,11 +2,11 @@
 
 # warnings.filterwarnings("ignore",
                         # category=FutureWarning)
-import parser as parser
-from analysis import main as analyze
-from run import main as run
+import sepal.parser as parser
 import sys
-from utils import banner
+from sepal.analysis import main as analyze
+from sepal.run import main as run
+from sepal.utils import banner
 import warnings
 
 def main()->None:

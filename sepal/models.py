@@ -25,9 +25,9 @@ from multiprocessing import cpu_count
 
 from typing import Tuple,Union,List
 
-from utils import eprint,wprint,iprint
-import utils as ut
-from datasets import RawData
+from sepal.utils import eprint,wprint,iprint
+import sepal.utils as ut
+from sepal.datasets import RawData
 
 class CountData(ABC):
     """Count Data Abstract class

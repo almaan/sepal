@@ -20,13 +20,13 @@ import json
 import numpy as np
 import pandas as pd
 
-import utils as ut
-from utils import iprint,eprint,wprint,VARS
+import sepal.utils as ut
+from sepal.utils import iprint,eprint,wprint,VARS
 
-from enrich import main as fea
-from family import main as families
-import models as m
-from datasets import RawData
+from sepal.enrich import main as fea
+from sepal.family import main as families
+import sepal.models as m
+from sepal.datasets import RawData
 
 from argparse import Namespace as ARGS
 

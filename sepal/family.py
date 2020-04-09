@@ -20,9 +20,9 @@ from sklearn.decomposition import PCA
 
 from argparse import Namespace as ARGS
 from typing import Tuple,Dict,Union,List,Any
-from utils import iprint,eprint,wprint,VARS
-import utils as ut
-import models as m
+from sepal.utils import iprint,eprint,wprint,VARS
+import sepal.utils as ut
+import sepal.models as m
 
 
 

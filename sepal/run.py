@@ -24,12 +24,12 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
-import utils as ut
-import models as m
-from datasets import RawData
+import sepal.utils as ut
+import sepal.models as m
+from sepal.datasets import RawData
 from argparse import Namespace as ARGS
 
-from utils import iprint,eprint,wprint
+from sepal.utils import iprint,eprint,wprint
 from typing import Mapping, Dict,Tuple,Type
 
 

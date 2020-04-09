@@ -17,7 +17,7 @@ from typing import List,Tuple
 from gprofiler import GProfiler
 from argparse import Namespace as ARGS
 
-from utils import iprint,wprint,eprint
+from sepal.utils import iprint,wprint,eprint
 
 def query_genes(genes : List[str],
                 organism : str,

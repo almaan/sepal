@@ -10,7 +10,7 @@ in sepal
 import re
 import datetime
 
-import __init__
+import sepal.__init__
 
 import time as Time
 import re
@@ -23,9 +23,6 @@ import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
 from scipy.ndimage import gaussian_filter
-
-
-
 from typing import Tuple,Dict,Union,List
 
 rcParams.update({'figure.max_open_warning': 0})
