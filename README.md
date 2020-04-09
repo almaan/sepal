@@ -165,6 +165,19 @@ provide 2 examples contained in jupyter notebooks:
 * Melanoma analysis  : [LINK](https://github.com/almaan/sepal/blob/master/examples/melanoma.ipynb)
 * Breast Cancer analysis : [LINK]()
 
+
+## Supported Files and Format
+
+We expect the input to `sepal` to be in the format
+`n_locations x n_genes`, however if your data is structured in the opposite way (`n_genes x n_locations`) simply provide
+the `--transpose` flag when running either the simulation or analysis and this will be taken care of. 
+
+We currently support `.csv`,`.tsv` and `.h5ad` formats. For the latter, we expect the data to be structured
+according to [THIS](https://github.com/almaan/space2h5ad/) format. We expect that there will be a release from the 
+`scanpy` team in the near future, where a standardized format for spatial data is presented, but until then we will be
+using the aforementioned standard.
+
+
 ## Data
 All the data we used is public, and can be found accessed at the following links:
 
@@ -174,8 +187,6 @@ All the data we used is public, and can be found accessed at the following links
 * Melanoma : [LINK][4],use ST\_mel1\_rep1
 * Cerebellum :[LINK][5], use Cerebellum\_Puck\_180819\_11
 
-However, you may also find these sets, processed and ready to use
-in the `data` directory.
 
 
 
@@ -186,3 +197,9 @@ in the `data` directory.
 [5]: https://singlecell.broadinstitute.org/single_cell/data/public/SCP354/slide-seq-study
 
 ## Results
+All the results presented in the study can be found in the `res` folder, both for 
+the real and synthetic data. For each sample we have structured the results accordingly:
+* `res/`
+    * `sample-name/`
+        * `X-diffusion-times.tsv` : diffusion times for all ranked genes
+        * `analysis/` : contains output of secondary analysis
