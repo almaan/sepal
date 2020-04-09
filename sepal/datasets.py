@@ -3,8 +3,35 @@
 import numpy as np
 import pandas as pd
 import os.path as osp
+import sys
 
 class RawData:
+    """
+    class to hold raw data,
+    is compatible with CountData
+    class.
+
+    Currently supported files are:
+
+    - tsv
+    - csv
+    - h5ad (requires anndata package)
+
+    Count data is expected to be in
+    format n_locations x n_genes. If
+    not, then use the transpose
+    argument.
+
+    Arguments:
+    ---------
+
+    pth : str
+        path to count data
+    transpose : bool
+        include to transpose count
+        data
+
+    """
 
     def __init__(self,
                  pth : str,
@@ -15,49 +42,88 @@ class RawData:
                               "csv",
                               "tsv"]
 
+        # prepare object variables
         self._cnt = None
         self._crd = {'pixel':None,
                      'array' : None,
                      }
 
+        # set original data path
         self.original_data = dict(file_path = pth)
 
+        # specify coordinates to use
+        # when plotting
         self._use_crd = 'pixel'
 
+        # get extension of file
         self.ext = self.get_ext(pth)
 
+        #
         if self.ext is not None:
             self.read_data(pth,
                            self.ext,
                            transpose,
                            )
+        else:
+            print("[ERROR] : could not identify"\
+                  " file type of : {}".format(pth))
+            sys.exit(-1)
 
     def get_ext(self,
-                fname : str,
+                pth : str,
                 )->str:
 
-        bname = osp.basename(fname)
-        splt = bname.split(".")
-        ext = (splt[-1] if not splt[-1]  == 'gz' else splt[-2])
-        ext = ext.lower()
+        """Get extension of path
 
+        Parameters:
+        ----------
+        pth :
+            filename
+
+        Returns:
+        -------
+
+        string with extension of file
+
+        """
+    
+        bname = osp.basename(pth)
+        splt = bname.split(".")
+        # adjust for gzipped files
+        ext = (splt[-1] if not splt[-1]  == 'gz' else splt[-2])
+        # set extension to lowercase
+        ext = ext.lower()
+        # error if not supported
         if ext not in self.supported_ext:
             print("[WARNING] : {} is not a supported file type")
             ext = None
-
         return ext
 
     def read_data(self,
-                  fname : str,
+                  pth : str,
                   ext : str,
                   transpose : bool = False,
                   )-> None:
+        """Read provided count data
 
+        Parameters:
+        ----------
+        pth :str
+            filename 
+        ext : str
+            extension of filename
+        transpose: bool
+            set as true if count data should
+            be transposed.
+
+        """
+
+        # if file is tsv or csv
         if ext in ['tsv','csv']:
             sep = dict(tsv = '\t',
                        csv = ',')
 
-            tmp = pd.read_csv(fname,
+            tmp = pd.read_csv(pth,
                               sep = sep[ext],
                               header = 0,
                               index_col = 0,
@@ -66,21 +132,35 @@ class RawData:
             if transpose:
                 tmp  = tmp.T
 
-            self._crd['pixel'] = np.array([[float(x.replace('X','')) for \
-                                        x in y.split('x') ] for\
-                                        y in tmp.index])
-
+            self._crd['pixel'] = [x.replace('X',"").split('x') for \
+                                  x in tmp.index.values]
+            self._crd['pixel'] = np.array(self._crd['pixel']).astype(float)
+            # take array coordinates as pixel coordinates
+            # needed since only one set of coordinates
+            # exists
             self._crd['array'] = self._crd['pixel']
 
             self._cnt = tmp
 
+        # if file is h5ad
         elif ext == 'h5ad':
-            import anndata as aD
+            # try to import anndata
+            # if fails. Exit
+            try:
+                import anndata as aD
+            except ImportError as e:
+                print("[ERROR] : you need to install anndata"\
+                      " in order to be able to use h5ad files\n"\
+                      " See : \n https://anndata.readthedocs.io/en/latest/\n"\
+                      " for more information",
+                      )
+                sys.exit(-1)
 
-            tmp = aD.read_h5ad(fname)
-
+            # read h5ad file
+            tmp = aD.read_h5ad(pth)
+            
             n_spots,n_feats = tmp.shape
-
+            # set pixel coordinates as x,y
             if 'x' in tmp.obs.keys() and 'y' in tmp.obs.keys():
 
                 self._crd['pixel'] = np.zeros((n_spots,2))
@@ -89,7 +169,7 @@ class RawData:
 
             else:
                 self._crd['pixel'] = None
-
+            # set array coordinates as _x,_y
             if '_x' in tmp.obs.keys() and '_y' in tmp.obs.keys():
 
                 self._crd['array'] = np.zeros((n_spots,2))
@@ -97,7 +177,8 @@ class RawData:
                 self._crd['array'][:,1] = tmp.obs['_y'].values
             else:
                 self._crd = None
-
+            # create data frame to hold count
+            # data
             self._cnt = pd.DataFrame(tmp.X,
                                     index = tmp.obs.index,
                                     columns = tmp.var['name'].values,
@@ -108,33 +189,66 @@ class RawData:
 
         self.shape = self._cnt.shape
 
-
     @property
     def cnt(self,) -> pd.DataFrame:
+        """set count data property"""
         return self._cnt
 
     @cnt.setter
-    def cnt(self,value : pd.DataFrame):
+    def cnt(self,
+            value : pd.DataFrame,
+            )->None:
 
+        """Update count data
+
+        will make sure to adjust coordinates
+        for new data. If new data contains
+        capture locations not present
+        in current data, those will
+        be ignored.
+
+        Parameters:
+        ----------
+        value : pd.DataFrame
+            new values
+
+        """
+
+        # get original rownames
         oRws = self._cnt.index.values
+        # get new rownames
         nRws = value.index.values
+        # sort new data according to
+        # old structure.
         kRws = np.array([np.argmax(x == oRws) for x in nRws])
-
+        # rearrange coordinates
         for crd_type in ['pixel','array']:
             if self._crd[crd_type] is not None:
                 self._crd[crd_type] = self._crd[crd_type][kRws,:]
 
-        self._cnt = value
+        inter =  value.index.intersection(self._cnt.index)
+        self._cnt = value.loc[inter,:]
         self.shape = self._cnt.shape
 
     @property
     def use_crd(self)->str:
+        """active coordinates"""
         return self._use_crd
 
     @use_crd.setter
     def use_crd(self,
                 crd_type : str, 
                 ) -> None:
+        """Set active coordinates
+
+        Parameters:
+        ----------
+
+        crd_tyoe : str
+            which coordinates to use.
+            choose beteen pixerl or array
+
+        """
 
         if crd_type in ['pixel','array']:
             self._use_crd = crd_type
@@ -144,9 +258,21 @@ class RawData:
 
     @property
     def crd(self,):
+        """Coordinates
+
+        Returns:
+        -------
+        will return active coordinates
+        """
         return self._crd[self.use_crd]
 
     def __repr__(self,):
+        """Representation
+        will print information
+        regarding original path
+        of data and active coordinates
+
+        """
         txt = []
         txt.append("RawData object")
         txt.append("\t> loaded from {}".format(self.original_data['file_path']))
@@ -155,4 +281,3 @@ class RawData:
         txt = '\n'.join(txt)
 
         return txt
-
