@@ -3,5 +3,10 @@ __pycache__/
 *.bak.*
 old/
 seurat/
-res/
 data/real/*h5ad
+sepal.egg-info/
+build/
+dist/
+process/
+res/*/genes/
+

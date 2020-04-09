@@ -7,8 +7,38 @@ This repo contains:
 * results presented in the publication
 
 
-## Installation
+## Download and Install
+`sepal` requires `python3`, preferably a version later than or equal to 3.5. To
+download and install, open the terminal and change to a directory where you want
+`sepal` to be downloaded to and do:
 
+```sh
+
+git clone https://github.com/almaan/sepal.git
+cd sepal
+chmod +x setup.py
+./setup.py install
+
+```
+Depending on your user privileges, you may have to add `--user`  as an argument to `setup.py`.
+Running the setup will give you the minimal required install to compute the diffusion times. However,
+if you want to be able to use the analysis modules, you also need to install the recommended packages.
+To do this, simply (in the same directory) run:
+
+```shape
+pip3 install "sepal[full]" -e
+```
+again, you may have to provide the `--user` flag, depending on user privileges.
+
+This should install both a command line interface (CLI) and a standard package.
+To test and see whether the installation was successful you could try executing the command:
+
+```sh
+sepal -h
+
+```
+Which should print the help message associated with sepal. If everyhing wored out for you so far,
+you may proceed to the example section to see `sepal` in action!
 
 ## Examples
 
@@ -93,7 +123,7 @@ sepal analyze -c ../../data/real/mob.tsv.gz \
 
 where we for example see that Family 0 is enriched for several processes related to neuronal function, generation and regulation:
 
-|    |   family | native     | name                                                               |     p_value | source   |   intersection_size |
+|    |   family | native     | name                                                               |     p\_value | source   |   intersection_size |
 |---:|---------:|:-----------|:-------------------------------------------------------------------|------------:|:---------|--------------------:|
 |  1 |        0 | GO:0007399 | nervous system development                                         | 5.59915e-06 | GO:BP    |                  30 |
 |  2 |        0 | GO:0050773 | regulation of dendrite development                                 | 0.000112462 | GO:BP    |                   9 |
@@ -123,6 +153,36 @@ where we for example see that Family 0 is enriched for several processes related
 | 26 |        0 | GO:0099537 | trans-synaptic signaling                                           | 0.0417471   | GO:BP    |                  12 |
 
 
+Of course, this analysis is by no means extensive. But rather an quick example to show how one operates the CLI for  `sepal` .
+
+### As imported package
+
+While `sepal` has been designed as a standalone tool, we've also constructed it
+to be functional as a standard python package from which functions may be
+imported and used in an integrated workflow. To show how this may be done, we
+provide 2 examples contained in jupyter notebooks:
+
+* Melanoma analysis  : [LINK](https://github.com/almaan/sepal/blob/master/examples/melanoma.ipynb)
+* Breast Cancer analysis : [LINK]()
+
 ## Data
+All the data we used is public, and can be found accessed at the following links:
+
+* MOB : [LINK][1], use Rep11
+* Mouse Brain : [LINK][2] 
+* Lymph Node :[LINK][3]
+* Melanoma : [LINK][4],use ST\_mel1\_rep1
+* Cerebellum :[LINK][5], use Cerebellum\_Puck\_180819\_11
+
+However, you may also find these sets, processed and ready to use
+in the `data` directory.
+
+
+
+[1]: https://www.spatialresearch.org/resources-published-datasets/doi-10-1126science-aaf2403/
+[2]: https://support.10xgenomics.com/spatial-gene-expression/datasets/1.0.0/V1_Adult_Mouse_Brain
+[3]: https://support.10xgenomics.com/spatial-gene-expression/datasets/1.0.0/V1_Human_Lymph_Node
+[4]: https://www.spatialresearch.org/resources-published-datasets/doi-10-1158-0008-5472-can-18-0747
+[5]: https://singlecell.broadinstitute.org/single_cell/data/public/SCP354/slide-seq-study
 
 ## Results
