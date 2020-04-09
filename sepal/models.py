@@ -16,7 +16,6 @@ from multiprocessing import cpu_count
 
 
 from typing import Tuple,Union,List
-from tqdm import tqdm
 
 from utils import eprint,wprint,iprint
 import utils as ut
@@ -434,24 +433,24 @@ class ST1K(CountData):
 
 
 class VisiumData(CountData):
-        """Visium count data class
+    """Visium count data class
 
-        Derivative of CountData used to hold
-        Visium array based data
+    Derivative of CountData used to hold
+    Visium array based data
 
 
-        data : RawData
-            data to be used stored in a RawData
-            object.
-        normalize: bool
-            if library-size normalization should
-            be applied to respective spot
-        eps : float
-            allowed difference in distance from
-            specified radius. Returns approximate
-            neighbors.
+    data : RawData
+        data to be used stored in a RawData
+        object.
+    normalize: bool
+        if library-size normalization should
+        be applied to respective spot
+    eps : float
+        allowed difference in distance from
+        specified radius. Returns approximate
+        neighbors.
 
-        """
+    """
 
 
     def __init__(self,
@@ -517,25 +516,24 @@ class VisiumData(CountData):
         return laplacian_hex(centers,nbrs,h)
 
 class ST2K(CountData):
-    
-        """ST2k count data class
+    """ST2k count data class
 
-        Derivative of CountData used to hold
-        ST2k array based data
+    Derivative of CountData used to hold
+    ST2k array based data
 
 
-        data : RawData
-            data to be used stored in a RawData
-            object.
-        normalize: bool
-            if library-size normalization should
-            be applied to respective spot
-        eps : float
-            allowed difference in distance from
-            specified radius. Returns approximate
-            neighbors.
+    data : RawData
+        data to be used stored in a RawData
+        object.
+    normalize: bool
+        if library-size normalization should
+        be applied to respective spot
+    eps : float
+        allowed difference in distance from
+        specified radius. Returns approximate
+        neighbors.
 
-        """
+    """
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 
@@ -604,27 +602,27 @@ class ST2K(CountData):
 
 
 class UnstructuredData(CountData):
-        """Unstructured count data class
+    """Unstructured count data class
 
-        Derivative of CountData used to hold
-        Unstructured data. Will first
-        injectively map unstructured locations
-        to a strucutred grid and then treat
-        as a ST1k array.
+    Derivative of CountData used to hold
+    Unstructured data. Will first
+    injectively map unstructured locations
+    to a strucutred grid and then treat
+    as a ST1k array.
 
 
-        data : RawData
-            data to be used stored in a RawData
-            object.
-        normalize: bool
-            if library-size normalization should
-            be applied to respective spot
-        eps : float
-            allowed difference in distance from
-            specified radius. Returns approximate
-            neighbors.
+    data : RawData
+        data to be used stored in a RawData
+        object.
+    normalize: bool
+        if library-size normalization should
+        be applied to respective spot
+    eps : float
+        allowed difference in distance from
+        specified radius. Returns approximate
+        neighbors.
 
-        """
+    """
 
 
     def __init__(self,
@@ -776,12 +774,45 @@ def laplacian_hex(centers : np.ndarray,
 def propagate(cd : CountData,
               thrs : float = 1e-8,
               dt : float = 0.001,
-              stopafter : float = 10e10,
+              stopafter : int = int(1e10),
               normalize : bool = True,
-              diffusion_rate : int = 1,
+              diffusion_rate : Union[float,np.ndarray] = 1.0,
               num_workers : int = None,
               )-> np.ndarray:
+    """Simulate Diffusion
 
+    Simulates diffusion by propagating
+    the system in time using Fick's
+    second law of diffusion
+
+    cd : CountData
+       count data object 
+    thrs : float
+        threshold for convergence
+    dt : float
+        timestep
+    stopafter : int 
+        stop after given number of iterations
+        if covergence is not reached
+    normalize : bool
+       normalize system, highly recommended
+    diffusion_rate : Union[float,np.ndarray]
+        diffusion rate (D). If float
+        then homogenous over whole are,
+        if array then each entry should
+        specify the diffusion rate
+        at a given location.
+    num_workers : int
+        number of workers to use
+        if none is given maximal
+        number is used
+
+    Returns:
+    -------
+    The diffusion time for
+    each profile
+
+    """
     if num_workers is None:
         num_workers = int(cpu_count())
     else:
@@ -802,44 +833,46 @@ def propagate(cd : CountData,
     else:
         iprint("Saturated Spots : {}".format(n_saturated))
 
+
+    # stabilizing normalization
     if normalize:
-
         ncnt = cd.cnt.values
-
         ncnt = ut.normalize_expression(ncnt)
-
         colMax = np.max(np.abs(ncnt),axis = 0).reshape(1,-1)
-
         ncnt = np.divide(ncnt,
                          colMax,
                          where = colMax > 0)
-
         ncnt = ncnt.astype(float)
-
     else:
         ncnt = cd.cnt.values.astype(float)
 
 
-    # get neighbour index
+    # get neighbor indices
     snidx = cd.get_satnbr_idx(cd.saturated)
     unidx = cd.get_unsatnbr_idx(cd.unsaturated)
 
     # Propagate in time
-    iterable = tqdm(range(cd.G))
-
-    times = Parallel(n_jobs=num_workers)(delayed(stepping)(gene,
-                                                 ncnt[:,gene],
+    try:
+        # will use tqdm progress bar
+        # if package installed
+        import tqdm
+        iterable = tqdm(range(cd.G))
+    except ImportError:
+        iterable = range(cd.G)
+    # spread on multiple workers
+    times = Parallel(n_jobs=num_workers)(delayed(stepping)(idx,
+                                                 ncnt[:,idx],
                                                  cd,
                                                  snidx,
                                                  unidx,
                                                  **diff_prop) for \
-                                         gene in iterable)
+                                         idx in iterable)
     times = np.array(times)
 
     return times
 
 
-def stepping(gene : int,
+def stepping(idx : int,
              conc : np.ndarray,
              cd : CountData,
              snidx : np.ndarray,
@@ -850,44 +883,97 @@ def stepping(gene : int,
              stopafter : int,
              )->float:
 
+        """Time stepping
+        
+        idx : int
+            index of profile
+        conc : np.ndarray
+            concentration values
+        cd : CountData
+            count data object
+        snidx : np.ndarray
+            index of neighbors to saturated spots
+        unidx : np.ndarray
+            index of neighbors to unsaturated spots
+        thrs : float
+            threshold for convergence
+        D : Union[float,np.ndarray]
+            
+        dt : float,
+            timestep
+        stopafter : int 
+            stop after given number of iterations
+            if covergence is not reached
+        Returns:
+        -------
+        time for profile
+        to reach convergence
+            
+        """
+
         maxDelta = np.inf
         time  = 0.0
 
         old_maxDelta = 1
 
         while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
+            # stop if convergence is not reached
             if time / dt > stopafter:
-                genename = cd.cnt.columns[gene]
+                genename = cd.cnt.columns[idx]
                 wprint("Gene :"
                       "{} did not converge"
                       "".format(genename))
                 break
 
+            # update old entropy value
             old_maxDelta = maxDelta
-
+            # update time
             time +=dt
 
+            # get laplacian
             d2 = cd.laplacian(conc[cd.saturated],
                               conc[snidx],
                               cd.h[cd.saturated])
 
+            # update concentration values
             dcdt = np.zeros(conc.shape[0])
 
             dcdt[cd.saturated] = D*d2
             dcdt[cd.unsaturated] = dcdt[cd.unsaturated]
 
             conc[cd.saturated] += dcdt[cd.saturated]*dt
-            # conc[cd.unsaturated] += dcdt[cd.unsaturated]
             conc[cd.unsaturated] += dcdt[unidx]*dt
-
+            # set values below zero to 0
             conc[conc < 0] = 0
-
+            # compute entropy
             maxDelta = entropy(conc[cd.saturated]) / cd.saturated.shape[0]
 
         return time
 
 
-def entropy(xx):
+def entropy(xx : np.ndarray,
+            )->float:
+    """Entropy of array 
+
+    Elements in the array are
+    normalized to represent
+    probability values. Then
+    Entropy are computed according
+    to the definitionby Shannon
+
+    S = -sum_i p_*log(p_i)
+
+    Parameters:
+    ----------
+    xx : np.ndarray
+        array for which entropy should
+        be calculated
+
+    Returns:
+    -------
+    Entropy of array
+
+    """
     xnz = xx[xx>0]
     xs = np.sum(xnz)
     xn = xnz / xs
