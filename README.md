@@ -15,10 +15,17 @@ This repo contains:
 ### CLI 
 
 
-Reference-style: 
 ![CLI run example][run_ex]
 
+
+![CLI analyze example][anl_ex]
+
+![Analysis output][vis_ex]
+
+
+[anl_ex]: https://github.com/almaan/sepal/blob/master/img/analyze-ex.gif?raw=true
 [run_ex]: https://github.com/almaan/sepal/blob/master/img/run-example.gif?raw=true
+[viz_ex]: https://github.com/almaan/sepal/blob/master/img/mob-ex.png?raw=true
 
 ## Data
 
