@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 import os.path as osp
 import sys
+from typing import Union,Dict,Tuple
 
 class RawData:
     """
@@ -43,10 +44,10 @@ class RawData:
                               "tsv"]
 
         # prepare object variables
-        self._cnt = None
-        self._crd = {'pixel':None,
-                     'array' : None,
-                     }
+        self._cnt : Union[pd.DataFrame] = pd.DataFrame([])
+        self._crd : Dict[str,np.ndarray] = {'pixel':np.ndarray([]),
+                                            'array' :np.ndarray([]),
+                                            }
 
         # set original data path
         self.original_data = dict(file_path = pth)
@@ -58,20 +59,20 @@ class RawData:
         # get extension of file
         self.ext = self.get_ext(pth)
 
-        #
-        if self.ext is not None:
+        # error if not supported
+        if self.ext not in self.supported_ext:
+            print("[WARNING] : {} is not a supported file type")
+            sys.exit(-1)
+
+        else:
             self.read_data(pth,
                            self.ext,
                            transpose,
                            )
-        else:
-            print("[ERROR] : could not identify"\
-                  " file type of : {}".format(pth))
-            sys.exit(-1)
 
     def get_ext(self,
                 pth : str,
-                )->str:
+                )->Union[str,None]:
 
         """Get extension of path
 
@@ -93,10 +94,6 @@ class RawData:
         ext = (splt[-1] if not splt[-1]  == 'gz' else splt[-2])
         # set extension to lowercase
         ext = ext.lower()
-        # error if not supported
-        if ext not in self.supported_ext:
-            print("[WARNING] : {} is not a supported file type")
-            ext = None
         return ext
 
     def read_data(self,
@@ -132,9 +129,8 @@ class RawData:
             if transpose:
                 tmp  = tmp.T
 
-            self._crd['pixel'] = [x.replace('X',"").split('x') for \
-                                  x in tmp.index.values]
-            self._crd['pixel'] = np.array(self._crd['pixel']).astype(float)
+            self._crd['pixel'] = np.array([x.replace('X',"").split('x') for \
+                                          x in tmp.index.values]).astype(float)
             # take array coordinates as pixel coordinates
             # needed since only one set of coordinates
             # exists
@@ -176,7 +172,9 @@ class RawData:
                 self._crd['array'][:,0] = tmp.obs['_x'].values
                 self._crd['array'][:,1] = tmp.obs['_y'].values
             else:
-                self._crd = None
+                self._crd['array'] = np.array([])
+                self._crd['pixel'] = np.array([])
+
             # create data frame to hold count
             # data
             self._cnt = pd.DataFrame(tmp.X,

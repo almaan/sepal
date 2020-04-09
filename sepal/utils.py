@@ -1,5 +1,11 @@
 #!/usr/bin/env python3
 
+""" Utilities
+
+Support functions and classes used
+in sepal
+
+"""
 
 import re
 import datetime
@@ -14,8 +20,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
-from scipy.spatial import KDTree
-from scipy.spatial.distance import cdist
 from scipy.ndimage import gaussian_filter
 
 from sklearn.cluster import AgglomerativeClustering as ACl
@@ -23,17 +27,43 @@ from sklearn.decomposition import PCA
 
 from typing import Tuple,Dict,Union,List
 
-from tqdm import tqdm
-
-from joblib import Parallel, delayed
-from multiprocessing import cpu_count
-
-import models as m
+# import models as m
 
 rcParams.update({'figure.max_open_warning': 0})
 
+def custom_print(title : str,
+           s: str,
+           )->None:
+    print("[{}] : {}".format(title,s))
+
+def eprint(s : str,
+           )->None:
+    custom_print("ERROR",s)
+
+def wprint(s : str,
+           )->None:
+    custom_print("WARNING",s)
+
+def iprint(s : str,
+           )->None:
+    custom_print("INFO",s)
+
+
+
 def normalize_expression(x : np.ndarray,
                          )->np.ndarray:
+    """Normalization procedure
+
+    Parameters:
+    -----------
+    x : np.ndarray
+        data to be normalized
+
+    Returns:
+    -------
+    vector with transformed data
+
+    """
     return np.log2(x + 2)
 
 
@@ -143,6 +173,7 @@ def clean_axes(ax : plt.Axes,
     ax.set_xticks([])
     for pos in ax.spines.keys():
         ax.spines[pos].set_visible(False)
+    return None
 
 def get_inflection_point(y : np.ndarray,
                          x : np.ndarray = None,
@@ -265,7 +296,7 @@ def plot_profiles(cnt : pd.DataFrame,
 
     """
 
-    # adjust side size to matlab untis
+    # adjust side size to matplotlib untis
     side_size /= 100
 
     # get expression values
@@ -320,7 +351,8 @@ def plot_profiles(cnt : pd.DataFrame,
         # conduct quantile scaling if specified
         if qscale is not None:
             if qscale > 0 and qscale < 1:
-                vals_q = np.quantile(vals,qscale,interpolation = 'nearest')
+                vals_q = np.quantile(vals,qscale,
+                                     interpolation = 'nearest')
                 vals[vals > vals_q] = vals_q
             else:
                 print('WARNING : {} is not a proper quantile value'.format(qscale),
@@ -633,7 +665,7 @@ def plot_representative(motifs : Dict[int,np.ndarray],
         ax[fl].set_title("Repr. Motif {}".format(fl))
 
     for ii in range(ax.shape[0]):
-        ax[ii] = clean_axes(ax[ii])
+        clean_axes(ax[ii])
 
     return fig,ax
 
@@ -647,7 +679,7 @@ def plot_families(counts : np.ndarray,
                   side_size : float = 3,
                   pltargs : dict = None,
                   split_title : list = None,
-                  )->List[Tuple[plt.Figure,plt.Axes]]:
+                  )->List[List[Tuple[plt.Figure,plt.Axes]]]:
 
     """ Plot pattern families
     
@@ -760,6 +792,14 @@ def timestamp() -> str:
                   str(datetime.datetime.now()))
 
 
+def banner()->None:
+    string ="                    _   \n"\
+            "                  .\ /.  \n"\
+            "                 < ~O~ > \n"\
+            "┌─┐┌─┐┌─┐┌─┐┬     '/_\\'  \n"\
+            "└─┐├┤ ├─┘├─┤│     \ | /  \n"\
+            "└─┘└─┘┴  ┴ ┴┴─┘    \|/   "
+    print("\n" + string)
 
 
 # def change_crd_index(df : pd.Index,

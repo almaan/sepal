@@ -3,61 +3,128 @@
 import numpy as np
 import pandas as pd
 import os.path as osp
+import sys
 
-from abc import ABC,abstractmethod, abstractproperty
+from abc import ABC,abstractmethod, abstractproperty,ABCMeta
 from scipy.spatial import KDTree
 from scipy.spatial.distance import cdist
 import lap
 
-import matplotlib.pyplot as plt
 
-from typing import Tuple
+from joblib import Parallel, delayed
+from multiprocessing import cpu_count
 
+
+from typing import Tuple,Union,List
+from tqdm import tqdm
+
+from utils import eprint,wprint,iprint
+import utils as ut
 from datasets import RawData
 
 class CountData(ABC):
+    """Count Data Abstract class
+
+    Represents the count data
+    holding the transcription
+    profiles. Contains the methods
+    necessary to simulate diffusion.
+
+    Arguments:
+    ---------
+    data : RawData
+        data to be used stored in a RawData
+        object.
+    nn : int
+        number of neighbours
+    normalize: bool
+        if library-size normalization should
+        be applied to respective spot
+    eps : float
+        allowed difference in distance from
+        specified radius. Returns approximate
+        neighbors.
+
+
+    """
     def __init__(self,
                  data : RawData,
-                 normalize : bool = True, 
+                 nn : int,
+                 normalize : bool = False, 
                  eps : float = 0.1,
                  )-> None:
 
-
+        
+        # set count data and coordinates
         self.cnt = data.cnt
         self.crd = data.crd
-
+        self.nn = nn
+        self.edges = np.array([])
+        # set real observed coordinates
+        # for visualization
         self.real_crd = data.crd
 
+        # format coordinates
+        # normlizes distances
         self._format_crd()
+        # update object specifications
         self._update_specs()
 
+        # set allowed radius
         self.r = 1
+        # set tolerance
         self.eps = eps
+        # set grid size
         self.h = self.r * np.ones(self.S,) 
-        
+        # set the order of the edges 
         self._set_edges()
 
+        # create a KDTree
         self.kdt = KDTree(self.crd)
+        # update which locations that
+        # have full neighborhood
+        # and which have not
         self._remove_unsaturated()
+
+    
+    # @property
+    # @classmethod
+    # @abstractmethod
+    # def edges(cls):
+    #     return NotImplementedError
+
+    # @property
+    # @abstractmethod
+    # def edges(self):
+    #     pass
 
     def _update_specs(self,
                       )->None:
+        """Update specifications"""
 
+        # set number of locations
         self.S = self.cnt.shape[0]
+        # set number of profiles
         self.G = self.cnt.shape[1]
 
-    def get_crd(self,
-                idx : pd.Index,
-                )->np.ndarray:
+    # TODO : remove method
+    # def get_crd(self,
+    #             idx : pd.Index,
+    #             )->np.ndarray:
 
-        crd = np.array([[float(x.replace('X','')) for \
-                        x in y.split('x') ] for\
-                        y in idx])
-        return crd
+    #     crd = np.array([[float(x.replace('X','')) for \
+    #                     x in y.split('x') ] for\
+    #                     y in idx])
+    #     return crd
 
     def _scale_crd(self,
                    )->None:
 
+        """Internally scale distances
+        to allow for different
+        array specifications
+
+        """
         dists = cdist(self.crd,self.crd)
         dists[dists == 0] = np.inf 
         mn =  dists.min() 
@@ -65,6 +132,10 @@ class CountData(ABC):
 
     def normalize(self,
                   )-> None:
+
+        """Library size normalization
+
+        """
 
         vs = self.cnt.values.astype(float)
         sm = vs.sum(axis=1)
@@ -82,25 +153,67 @@ class CountData(ABC):
 
     def _remove_unsaturated(self,
                             )-> None:
+        """Update location saturation
 
-        self.saturated = []
-        self.unsaturated = []
+        Identifies which locations that
+        have a full neighborhood (saturated)
+        or incomplete neighborhood (unsaturated)
+        respectively. Unsaturated locations
+        are considered as boundary points.
 
+
+        """
+
+        # lists to be filled in
+        self.saturated  = np.array([],
+                                   dtype=int)
+        self.unsaturated = np.array([],
+                                    dtype=int)
+
+        # find neighbors for every spot
         for spot in range(self.S):
             nbr = self.kdt.query_ball_point(self.crd[spot,:],
                                             self.r + self.eps,
                                             )
+            # if full neighborhood consuder saturated
             if len(nbr) >= self.nn + 1:
-                self.saturated.append(spot)
+                self.saturated = np.append(self.saturated,int( spot ))
+            # else add to unsaturated
             else:
-                self.unsaturated.append(spot)
-                
-        self.saturated = np.array(self.saturated).astype(int)
+                self.unsaturated = np.append(self.unsaturated,int( spot ))
+
+        # set data frame indices of saturated and unsaturated
+        # spots
         self.saturated_idx = self.cnt.index[self.saturated]
+        self.unsaturated_idx = self.cnt.index[self.unsaturated]
 
     def get_satnbr_idx(self,
                        sel : np.ndarray,
                        ) -> np.ndarray:
+        """get neighbors of saturated
+        locations
+
+        Parameters:
+        ----------
+
+        sel : np.ndarray
+            spot indices to get neighbors for
+
+        Returns:
+        -------
+        Neighbors of selected locations
+        ordered by their relative position
+        to the locations
+
+        """
+
+        # check if specified locations
+        # are saturated
+        _sat_set = set(self.saturated)
+        _sel_set = set(sel)
+        size_inter = len(_sat_set.intersection(_sel_set))
+        if len(_sel_set) != size_inter:
+            wprint("selected locations are not all saturated")
 
         nbrs = self.kdt.query_ball_point(self.crd[sel,:],
                                         self.r + self.eps)
@@ -119,8 +232,39 @@ class CountData(ABC):
                        sel : np.ndarray,
                        ) -> np.ndarray:
 
+        """get neighbors of unsaturated
+        locations.
+
+        For each unsaturated location
+        it will return the index
+        of the nearest saturated
+        point
+
+        Parameters:
+        -----------
+        sel : np.ndarray
+            array with indices of unsaturated
+            locations to get neighbors for
+
+        Returns:
+        -------
+        Indices of nearest saturated
+        locations for the queried unsaturated
+        locations.
+
+        """
+
+        # check if specified locations
+        # are saturated
+        _uns_set = set(self.unsaturated)
+        _sel_set = set(sel)
+        size_inter = len(_uns_set.intersection(_sel_set))
+        if len(_sel_set) != size_inter:
+            wprint("selected locations are not all unsaturated")
+
         dmat = cdist(self.crd,self.crd)
         dmat = dmat[sel,:]
+        dmat[:,self.unsaturated] = np.inf
         dmat[:,sel] = np.inf
 
         
@@ -129,42 +273,73 @@ class CountData(ABC):
         
         return nbrs.astype(int)
 
+    # def get_allnbr_cnt(self,
+    #                         )-> Tuple[np.ndarray,...]:
 
+    #     idxs = self.get_allnbr_idx(self.saturated)
 
-
-    def get_allnbr_cnt(self,
-                            )-> Tuple[np.ndarray,...]:
-
-        idxs = self.get_allnbr_idx(self.saturated)
-
-        return (self.cnt.values[self.saturated,:],
-                self.cnt.values[idxs,:])
+    #     return (self.cnt.values[self.saturated,:],
+    #             self.cnt.values[idxs,:])
 
     def _getpos(self,
                 origin_idx : int,
                 nbr_idx : int,
                 )-> int:
 
-        vec =  self.crd[nbr_idx,:] - self.crd[origin_idx,:] 
-        vec = vec / np.linalg.norm(vec)
-        theta = np.arccos(vec[0])
+        """get edge position
+        for a neighbor to a specified
+        location.
 
+        Parameters:
+        ----------
+        origin_idx : int
+            index of location used as reference
+        nbr_idx : int
+           index of neighbor to reference 
+
+        Returns:
+        -------
+        Indicator of which edge
+        the neighbor represents
+
+        """
+
+        # compute difference between
+        # reference and neighbor coordinate
+        # vectors
+        vec =  self.crd[nbr_idx,:] - self.crd[origin_idx,:] 
+        # normalize to unit norm
+        vec = vec / np.linalg.norm(vec)
+        # compute angle between
+        # differnece vector and
+        # x-axis : span([1,0]^T)
+        theta = np.arccos(vec[0])
+        # map theta in [-pi,pi]
+        # to theta in [0,2pi]
         if vec[1] < 0:
             theta = 2*np.pi - theta
 
+        # find edge which neighbor
+        # most likely represent
         pos = np.argmin(np.abs(self.edges - theta))
+        # make sure integer
         pos = pos.astype(int)
-
         return pos
 
     @abstractmethod
     def _set_edges(self,
                    ) -> None:
+        """determines the angle between
+        a point and its respective neighbors
+        """
         pass
     
     @abstractmethod
     def _format_crd(self,
                    ) -> None:
+        """format coordinates
+        usually internal scaling
+        """
         pass
 
     @abstractmethod
@@ -173,35 +348,59 @@ class CountData(ABC):
                   nbrs : np.ndarray,
                   h : np.ndarray,
                   )-> np.ndarray:
-        pass
+        """definition of laplacian
 
-    # @abstractmethod
-    # def gradient(self,
-    #              centers : np.ndarray,
-    #              nbrs : np.ndarray,
-    #              h: np.ndarray,
-    #              ) -> np.ndarray:
-    #     pass
+        """
+        pass
 
 class ST1K(CountData):
     def __init__(self,
-                 cnt : pd.DataFrame,
-                 normalize : bool = True, 
+                 cnt : RawData,
+                 normalize : bool = False, 
                  eps : float = 0.1,
                  )-> None:
+        """ST1k count data class
+
+        Derivative of CountData used to hold
+        ST1k array based data
+
+
+        data : RawData
+            data to be used stored in a RawData
+            object.
+        normalize: bool
+            if library-size normalization should
+            be applied to respective spot
+        eps : float
+            allowed difference in distance from
+            specified radius. Returns approximate
+            neighbors.
+
+        """
 
         self.nn = 4
-        super().__init__(cnt,normalize,eps)
+        super().__init__(cnt,
+                         self.nn,
+                         normalize,
+                         eps,)
 
     def _format_crd(self,
                 )->None:
+        """format coordinates"""
 
         self.crd = self.crd.round(0)
         self._scale_crd()
 
     def _set_edges(self,
                    )->None:
+        """determine edges
 
+        The edges are set to be arranged
+        with pi/2 radians apart along,
+        parallel to the coordinate
+        axis.
+
+        """
         self.edges = np.array([np.pi / 2 * n for \
                                n in range(4)])
 
@@ -211,25 +410,78 @@ class ST1K(CountData):
                   h : np.ndarray,
                   )-> np.ndarray:
 
+        """second order approxiation
+        of the laplacian. Uses
+        five point stencil.
+
+        Parameters:
+
+        centers : np.ndarray
+            values at center (reference)
+        nbrs : np,ndarray
+            values at neighboring spots
+        h : np.ndarray
+            step size
+
+        Returns:
+        -------
+        Numerical approximation of laplacian
+        at each location
+
+        """
+        
         return laplacian_rect(centers,nbrs,h)
 
 
 class VisiumData(CountData):
+        """Visium count data class
+
+        Derivative of CountData used to hold
+        Visium array based data
+
+
+        data : RawData
+            data to be used stored in a RawData
+            object.
+        normalize: bool
+            if library-size normalization should
+            be applied to respective spot
+        eps : float
+            allowed difference in distance from
+            specified radius. Returns approximate
+            neighbors.
+
+        """
+
+
     def __init__(self,
                  cnt : pd.DataFrame,
-                 normalize : bool = True, 
+                 normalize : bool = False, 
                  eps : float = 0.1,
                  )-> None:
 
         self.nn = 6
-        super().__init__(cnt,normalize,eps)
+        super().__init__(cnt,
+                         self.nn,
+                         normalize,
+                         eps)
 
     def _format_crd(self,
                     )->None:
+        """format coordinates"""
         self._scale_crd()
 
     def _set_edges(self,
                    )->None:
+        """determine edges
+
+        The edges are set to be arranged
+        with pi/3 radians apart. See
+        supplementary figure 1
+        for description of arrangement
+
+        """
+
 
         self.edges = np.pi / 6 + \
             np.array([n * np.pi / 3 for n in range(6)])
@@ -242,10 +494,48 @@ class VisiumData(CountData):
                     h : np.ndarray,
                     )-> np.ndarray:
 
+        """second order approximation
+        of the laplacian. Uses
+        seven point stencil.
+
+        Parameters:
+
+        centers : np.ndarray
+            values at center (reference)
+        nbrs : np,ndarray
+            values at neighboring spots
+        h : np.ndarray
+            step size
+
+        Returns:
+        -------
+        Numerical approximation of laplacian
+        at each location
+
+        """
+
         return laplacian_hex(centers,nbrs,h)
 
 class ST2K(CountData):
+    
+        """ST2k count data class
 
+        Derivative of CountData used to hold
+        ST2k array based data
+
+
+        data : RawData
+            data to be used stored in a RawData
+            object.
+        normalize: bool
+            if library-size normalization should
+            be applied to respective spot
+        eps : float
+            allowed difference in distance from
+            specified radius. Returns approximate
+            neighbors.
+
+        """
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 
@@ -253,15 +543,28 @@ class ST2K(CountData):
                  )-> None:
 
         self.nn = 4
-        super().__init__(cnt,normalize,eps)
+        super().__init__(cnt,
+                         self.nn,
+                         normalize,
+                         eps)
 
     def _format_crd(self,
                 )->None:
+        """format coordinates"""
 
         self._scale_crd()
 
     def _set_edges(self,
                    )->None:
+
+        """determine edges
+
+        The edges are set to be arranged
+        with pi/2 radians apart along, with
+        pi/4 degrees from respective
+        coordinate axis
+
+        """
 
         self.edges = np.pi / 4 + \
             np.array([np.pi / 2 * n for n in range(4)])
@@ -276,11 +579,54 @@ class ST2K(CountData):
                   h : np.ndarray,
                   )-> np.ndarray:
 
+        """second order approxiation
+        of the laplacian. Uses
+        five point stencil.
+
+        Parameters:
+
+        centers : np.ndarray
+            values at center (reference)
+        nbrs : np,ndarray
+            values at neighboring spots
+        h : np.ndarray
+            step size
+
+        Returns:
+        -------
+        Numerical approximation of laplacian
+        at each location
+
+        """
+
         return laplacian_rect(centers,nbrs,h)
 
 
 
 class UnstructuredData(CountData):
+        """Unstructured count data class
+
+        Derivative of CountData used to hold
+        Unstructured data. Will first
+        injectively map unstructured locations
+        to a strucutred grid and then treat
+        as a ST1k array.
+
+
+        data : RawData
+            data to be used stored in a RawData
+            object.
+        normalize: bool
+            if library-size normalization should
+            be applied to respective spot
+        eps : float
+            allowed difference in distance from
+            specified radius. Returns approximate
+            neighbors.
+
+        """
+
+
     def __init__(self,
                  cnt : pd.DataFrame,
                  normalize : bool = True, 
@@ -289,58 +635,91 @@ class UnstructuredData(CountData):
 
         self.nn = 4
         super().__init__(cnt,
+                         self.nn,
                          normalize,
                          eps)
 
     def _format_crd(self,
                 )->None:
-
+        """format coordinates"""
         self._to_structured()
         self._scale_crd()
 
     def _set_edges(self,
                    )->None:
+        """determine edges
 
+        The edges are set to be arranged
+        with pi/2 radians apart along,
+        parallel to the coordinate
+        axis.
+
+        """
         self.edges = np.array([np.pi / 2 * n for n in range(4)])
 
     def _to_structured(self,
                         )->np.ndarray:
+        """Transform unstructured data to structured
 
-            xmin,ymin = np.min(self.crd,axis = 0) 
-            xmax,ymax = np.max(self.crd,axis = 0) 
+        Defines a structured grid over the
+        domain which the unstructured
+        data is observered within. Then
+        formulates a LAP (Linear Assignment Problem) P.
 
-            npoints = np.ceil(np.sqrt(self.crd.shape[0]))
-            npoints = npoints.astype(int) 
-            
-            xx = np.linspace(xmin,xmax,npoints)
-            yy = np.linspace(ymin,ymax,npoints)
+        P is equivalent to minimizing the
+        cost (defined by the distance) of moving
+        a location to a newly defined grid point.
 
-            XX,YY = np.meshgrid(xx,yy)
-            gx = XX.reshape(-1,1)
-            gy = YY.reshape(-1,1)
-            gcrd = np.hstack((gx,gy))
+        Returns:
+        -------
+        Array with new mapped coordinates
 
-            dmat = cdist(self.crd,
-                         gcrd,
-                         metric = 'euclidean')
+        """
 
-            _,cidxs,ridxs = lap.lapjv(np.exp(dmat / dmat.max()),
-                                      extend_cost = True)
-            ncrd = gcrd[cidxs,:]
+        # get range of unstructured data
+        xmin,ymin = np.min(self.crd,axis = 0) 
+        xmax,ymax = np.max(self.crd,axis = 0) 
 
-            delta_x = np.diff(xx)[0]
-            delta_y = np.diff(yy)[0]
+        # generate grid over domain
+        npoints = np.ceil(np.sqrt(self.crd.shape[0]))
+        npoints = npoints.astype(int) 
+        
+        xx = np.linspace(xmin,xmax,npoints)
+        yy = np.linspace(ymin,ymax,npoints)
+
+        XX,YY = np.meshgrid(xx,yy)
+        gx = XX.reshape(-1,1)
+        gy = YY.reshape(-1,1)
+        gcrd = np.hstack((gx,gy))
+
+        # compute cost matrix
+        dmat = cdist(self.crd,
+                     gcrd,
+                     metric = 'euclidean')
+
+        # solve LAP
+        _,cidxs,ridxs = lap.lapjv(np.exp(dmat / dmat.max()),
+                                  extend_cost = True)
+        # get new coordinates
+        ncrd = gcrd[cidxs,:]
+
+        # scale coordinates
+        delta_x = np.diff(xx)[0]
+        delta_y = np.diff(yy)[0]
 
 
-            ncrd[:,0] = (ncrd[:,0] - xmin ) / delta_x
-            ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
+        ncrd[:,0] = (ncrd[:,0] - xmin ) / delta_x
+        ncrd[:,1] = (ncrd[:,1] - ymin ) / delta_y
 
-            h = dmat[np.arange(dmat.shape[0]),cidxs]
-            h = h / h.max()
-            h = h.reshape(-1,)
+        # compute step sizes
+        h = dmat[np.arange(dmat.shape[0]),cidxs]
+        h = h / h.max()
+        h = h.reshape(-1,)
 
-            self.crd = ncrd
-            self.h = h
+        # update stepsize and
+        # coordinates
+        self.crd = ncrd
+        self.h = h
 
     def laplacian(self,
                 centers : np.ndarray,
@@ -348,12 +727,35 @@ class UnstructuredData(CountData):
                 h : np.ndarray,
                 )-> np.ndarray:
 
-        return laplacian_rect(centers,nbrs,h)
+
+        """second order approxiation
+        of the laplacian. Uses
+        five point stencil.
+
+        Parameters:
+
+        centers : np.ndarray
+            values at center (reference)
+        nbrs : np,ndarray
+            values at neighboring spots
+        h : np.ndarray
+            step size
+
+        Returns:
+        -------
+        Numerical approximation of laplacian
+        at each location
+
+        """
+        return laplacian_rect(centers,
+                              nbrs,
+                              h)
 
 def laplacian_rect(centers : np.ndarray,
                    nbrs : np.ndarray,
                    h : float,
                    )-> np.ndarray:
+    """Laplacian approx rectilinear grid"""
 
     d2f = nbrs.sum(axis = 1) - 4*centers
     d2f = d2f / h**2
@@ -364,17 +766,17 @@ def laplacian_hex(centers : np.ndarray,
                   nbrs : np.ndarray,
                   h : float,
                   )-> np.ndarray:
-
+    """Laplacian approx hexagonal grid"""
     d2f = nbrs.sum(axis = 1) - 6*centers
     d2f = d2f / h**2 * 2 / 3
 
     return d2f
 
 
-def propagate(cd : m.CountData,
+def propagate(cd : CountData,
               thrs : float = 1e-8,
               dt : float = 0.001,
-              stopafter : int = 10e10,
+              stopafter : float = 10e10,
               normalize : bool = True,
               diffusion_rate : int = 1,
               num_workers : int = None,
@@ -386,7 +788,7 @@ def propagate(cd : m.CountData,
         num_workers = min(num_workers,
                           cpu_count())
 
-    print("[INFO] : Using {} workers".format(num_workers))
+    iprint("Using {} workers".format(num_workers))
 
     diff_prop = {'D':diffusion_rate,
                  'thrs':thrs,
@@ -395,10 +797,10 @@ def propagate(cd : m.CountData,
 
     n_saturated = cd.saturated.shape[0]
     if n_saturated < 1:
-        print("[ERROR] : No Saturated spots")
+        eprint("No Saturated spots")
         sys.exit(-1)
     else:
-        print("[INFO] : {} Saturated Spots".format(n_saturated))
+        iprint("Saturated Spots : {}".format(n_saturated))
 
     if normalize:
 
@@ -439,7 +841,7 @@ def propagate(cd : m.CountData,
 
 def stepping(gene : int,
              conc : np.ndarray,
-             cd : m.CountData,
+             cd : CountData,
              snidx : np.ndarray,
              unidx : np.ndarray,
              thrs : float,
@@ -449,14 +851,14 @@ def stepping(gene : int,
              )->float:
 
         maxDelta = np.inf
-        time  = 0
+        time  = 0.0
 
         old_maxDelta = 1
 
         while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
             if time / dt > stopafter:
                 genename = cd.cnt.columns[gene]
-                print("WARNING : Gene :"
+                wprint("Gene :"
                       "{} did not converge"
                       "".format(genename))
                 break
@@ -491,4 +893,3 @@ def entropy(xx):
     xn = xnz / xs
     xl = np.log(xn)
     return (-xl*xn).sum()
-
