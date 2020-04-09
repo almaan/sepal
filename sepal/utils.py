@@ -24,31 +24,37 @@ from matplotlib import rcParams
 
 from scipy.ndimage import gaussian_filter
 
-from sklearn.cluster import AgglomerativeClustering as ACl
-from sklearn.decomposition import PCA
+
 
 from typing import Tuple,Dict,Union,List
-
-# import models as m
 
 rcParams.update({'figure.max_open_warning': 0})
 
 def custom_print(title : str,
            s: str,
            )->None:
+    """custumo print"""
     print("[{}] : {}".format(title,s))
 
 def eprint(s : str,
            )->None:
+    """error print"""
     custom_print("ERROR",s)
 
 def wprint(s : str,
            )->None:
+    """warning print"""
     custom_print("WARNING",s)
 
 def iprint(s : str,
            )->None:
+    """info print"""
     custom_print("INFO",s)
+
+class VARS:
+    """default variables"""
+    SEL_COLUMN = 'average'
+    PVAL_EPS = 1e-273
 
 
 
@@ -403,193 +409,6 @@ def plot_profiles(cnt : pd.DataFrame,
 
     return (fig,ax)
 
-def get_eigen_dmat(vals : np.ndarray,
-                   ) -> np.ndarray :
-    """compute distance
-    matrix in eigenpattern space.
-    If the eigenpattern space has
-    dimension |K| and |P| profiles
-    are analyzed, vals should have
-    the shape |P|x|K|
-
-    Parameters:
-    ----------
-
-    vals : np.ndarray
-       expression profiles projections
-       onto eigenpattern space. Given
-       w.r.t. to eigenpattern basis.
-
-    Returns:
-    -------
-    Returns distance matrix
-    for expression profiles
-    projections. Shape is
-    |P|x|P|
-
-
-    """
-
-    # unit normalize vectors 
-    nrm = np.linalg.norm(vals,axis = 1,
-                         keepdims = True)
-    vals = safe_div(vals,
-                     nrm,
-                    )
-
-    # compute inner product
-    dmat = np.dot(vals,vals.T)
-    # adjust for numerical errors
-    dmat[np.abs(dmat - 1) < 10e-6] = 1.0
-    dmat[np.abs(dmat + 1) < 10e-6] = -1.0
-    # compute angle between all vectors
-    dmat = np.arccos(dmat)
-
-    return dmat
-
-
-def get_eigenpatterns( mat : np.ndarray,
-                       thrs : float = 0.99,
-                       )-> Tuple[np.ndarray,np.ndarray] :
-    """Compute eigenpatterns 
-
-    For a set of transcription profiles,
-    compute the eigenpatterns that
-    explain thrs amount of the
-    variance in the data.
-
-    The dimensions of mat is expected
-    to be n_locations x n_profiles
-
-    Parameters:
-    ----------
-
-    mat : np.ndarray
-        matrix containing the expression profiles
-    thrs : float
-        percentage of the variance that should
-        be explained by eigenpatterns
-
-    Returns
-    -------
-    A tuple with first element being the
-    eigenpatterns and the second being
-    the expression profiles projected
-    onto eigenpattern space, given
-    in the basis constructed from the
-    eigenpatterns
-
-
-    """
-
-    if thrs > 1:
-        thrs = thrs * 0.01
-
-    # treat genes as observations and
-    # locations as features
-    pca_fit = PCA().fit(mat.T)
-
-    # compute number of components required
-    expl_var = pca_fit.explained_variance_ratio_
-
-    # get number of eigenpatterns rquired
-    # to explain specified variance
-    n_comps = np.argmax(np.cumsum(expl_var) > thrs)
-    evecs = pca_fit.components_[0:n_comps+1,:]
-    # make unit vectors
-    norms = np.linalg.norm(evecs,
-                            axis = 1,
-                            keepdims=True)
-
-    # normalize to unit length
-    evecs = safe_div(evecs,norms)
-
-    # get projection w.r.t. eigenpattern
-    # basis
-    loads = np.dot(evecs,mat).T
-
-    return (evecs,loads)
-
-
-def get_families(counts : np.ndarray,
-                 n_base : int = 500,
-                 n_sort : int = 100,
-                 threshold : float = 0.9,
-                 )->Tuple[np.ndarray,Dict[int,np.ndarray]]:
-
-    """Get pattern families
-
-    Sort transcription profiles into
-    pattern families.
-
-
-    Parameters:
-    ----------
-
-    counts : np.ndarray
-        count matrix for the expression patterns.
-        Dimensions ares (n_locations x n_profiles)
-    n_base : int
-        number of profiles to use upon extraction
-        of eigenpatterns
-    n_sort : int
-        number of profiles to be assorted
-        into pattern families
-    threshold : float
-        percentage of variance that should be
-        explained by the eigenpatterns
-
-    Returns:
-    -------
-    Tuple with first element being the
-    family index of each profile and second
-    element being a dictionary with the profile
-    of each representative pattern.
-
-    """
-
-    # get eigenpatterns and projections
-    epats,loads = get_eigenpatterns(counts[:,0:n_base],
-                                    thrs = threshold)
-
-    # only use n_sort profiles to
-    # construct the families
-    loads = loads[0:n_sort,:]
-
-    # unit normalize
-    norms = np.linalg.norm(loads,
-                           axis = 1,
-                           keepdims = True,
-                           )
-    nloads = safe_div(loads,norms)
-
-
-    n_patterns = epats.shape[0]
-    print("[INFO] : Using {} eigenpatterns".format(n_patterns))
-
-
-    fidx = ACl(n_clusters = n_patterns,
-               affinity = 'precomputed',
-               linkage = 'complete',
-               ).fit_predict(get_eigen_dmat(nloads))
-
-    n_families = np.unique(fidx).shape[0]
-
-    # compute representative motifs
-    motifs = {}
-    for fl in np.unique(fidx):
-        av_loads = np.mean(loads[fidx == fl,:],
-                           axis = 0,
-                           keepdims = True)
-
-        rpat = np.dot(av_loads,epats).flatten()
-        motifs.update({fl:rpat})
-
-
-    print("[INFO] : Identified {} families".format(n_families))
-
-    return (fidx,motifs)
-
 def plot_representative(motifs : Dict[int,np.ndarray],
                         crd : np.ndarray,
                         ncols : int,
@@ -672,122 +491,6 @@ def plot_representative(motifs : Dict[int,np.ndarray],
     return fig,ax
 
 
-def plot_families(counts : np.ndarray,
-                  genes : pd.Index,
-                  crd : np.ndarray,
-                  labels : np.ndarray,
-                  ncols : int,
-                  normalize : bool = True,
-                  side_size : float = 3,
-                  pltargs : dict = None,
-                  split_title : list = None,
-                  )->List[List[Tuple[plt.Figure,plt.Axes]]]:
-
-    """ Plot pattern families
-    
-    Parameters:
-    ----------
-    counts : np.ndarray
-        count matrix with transcription profiles
-    genes : pd.Index
-        name of gens to include
-    crd : np.ndarray
-        coordinates. [n_locations x 2]
-    labels : np.ndarray
-        labels indicating which family respective
-        profile belongs to
-    ncols : int
-        number of columns
-    normalize : bool
-       set to true if log transform
-       (normalization) of expression
-       values should be performed.
-    side_size : float
-        size of the side of each
-        plotted profile. Unit is
-        pixels.
-    pltargs : dict
-        dictionary with style
-        features for plotting
-    split_title: Tuple[str,int]
-        include if profile names should
-        be splitted. First element is string
-        to split by, second the element
-        to keep.
-    
-    Returns
-    -------
-
-    Tuple of Figure and the corresponding
-    axes objects containing visualization
-    of the families
-
-    """
-
-    side_size *= 0.01
-
-    # set aesthetics
-    _pltargs = {'s':40,
-                'edgecolor':'black',
-                'cmap':plt.cm.PuRd,
-                }
-
-    if pltargs is not None:
-        for k,v in pltargs.items():
-            _pltargs[k] = v
-            if k == 'cmap' and isinstance(k,str):
-                _pltargs[k] = eval(v)
-
-
-    # generate visualizations for
-    # each family
-    vizlist = []
-    uni_labels = np.unique(labels)
-    uni_labels = np.sort(uni_labels[uni_labels >= 0])
-
-    for k,lab in enumerate(uni_labels):
-
-        pos = np.where(labels == lab)[0]
-
-        nrows = np.ceil(pos.shape[0] / ncols).astype(int)
-
-        figsize = (1.2 * ncols * side_size,
-                   1.2 * nrows * side_size)
-
-        vizlist.append(list(plt.subplots(nrows,
-                                         ncols,
-                                         figsize = figsize)))
-
-        vizlist[-1][0].suptitle("Family {}".format(lab))
-
-        vizlist[-1][1] = vizlist[-1][1].flatten()
-
-        for ii in range(pos.shape[0]):
-            vals = counts[:,pos[ii]]
-            if normalize:
-                vals = normalize_expression(vals)
-
-            title = genes[pos[ii]]
-            if split_title is not None:
-                title = title.split(split_title[0])[int(split_title[1])]
-
-            vizlist[-1][1][ii].set_title("Gene : {}".format(title),
-                                         fontsize = 15)
-            vizlist[-1][1][ii].scatter(crd[:,0],
-                                       crd[:,1],
-                                       c = vals,
-                                       **_pltargs,
-                                       )
-
-            vizlist[-1][1][ii].set_aspect('equal')
-            clean_axes(vizlist[-1][1][ii])
-
-        for jj in range(ii+1,ncols*nrows):
-            clean_axes(vizlist[-1][1][jj])
-            vizlist[-1][1][jj].set_visible(False)
-
-    return vizlist
-
 def timestamp() -> str:
     """generate date-based tag"""
     return re.sub(':|-|\.| |','',
@@ -802,21 +505,8 @@ def banner()->None:
           "└─┐├┤ ├─┘├─┤│     \ | /  \n"\
           "└─┘└─┘┴  ┴ ┴┴─┘    \|/   "
     # print("\n")
-    v = "Version {} : |  see https://github.com/almaan/sepal".format(__init__.__version__)
+    v = "Version {} |  see https://github.com/almaan/sepal".format(__init__.__version__)
     print( logo + "\n" + v)
 
 
-
-# def change_crd_index(df : pd.Index,
-#                      new_crd : np.ndarray) -> pd.Index :
-
-#     new_idx = [ 'x'.join(crd[x,:].astype(str)) for\
-#                 x in range(crd.shape[0])]
-
-#     new_idx = pd.Index(new_idx)
-
-#     old_idx  = df.index
-#     df.index = new_idx
-
-#     return (df,old_idx)
 

@@ -21,120 +21,14 @@ import numpy as np
 import pandas as pd
 
 import utils as ut
-from utils import iprint,eprint,wprint
+from utils import iprint,eprint,wprint,VARS
+
+from enrich import main as fea
+from family import main as families
 import models as m
 from datasets import RawData
 
 from argparse import Namespace as ARGS
-
-
-
-class VARS:
-    """default variables"""
-    SEL_COLUMN = 'average'
-    PVAL_EPS = 1e-273
-
-def enrich(args : ARGS,
-           )->None:
-    return None
-
-def family(times_all :pd.DataFrame,
-           cd : m.CountData,
-           sampletag : str,
-           args : ARGS,
-           )->None:
-
-    iprint("Assembling pattern families")
-
-    # sort profiles by their rank metric
-    sort_genes = np.argsort(times_all[VARS.SEL_COLUMN].values)[::-1]
-
-    # select number of profiles
-    # to construct eigenspace basis from
-    if args.n_base_genes is None:
-        args.n_base_genes = np.min((args.n_genes*2,
-                                    times_all.shape[0]))
-    else:
-        args.n_base_genes = np.min((args.n_base_genes,
-                                    times_all.shape[0]))
-
-    # get sorted rank metric
-    use_genes = times_all.index.values[sort_genes]
-    # adjust threshold
-    args.threshold = np.clip(args.threshold,0,100)
-    # if percentage is given adjust
-    # to fraction
-    if args.threshold > 1:
-        args.threshold *= 0.01
-
-    # get families and representative motifs
-    family_labels,repr_patterns = ut.get_families(cd.cnt.loc[:,use_genes].values,
-                                    n_base = args.n_base_genes,
-                                    n_sort = args.n_genes,
-                                    threshold = args.threshold,
-                                    )
-    # save family assortment
-    families = pd.DataFrame(family_labels,
-                            index = use_genes[0:args.n_genes],
-                            columns = ['family'],
-                            )
-    
-    out_fl_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
-                                                            'family',
-                                                            'index.tsv']
-                                                            ))
-    families.to_csv(out_fl_pth,
-                    sep = '\t',
-                    header = True,
-                    index = True,
-                    )
-    # save representative patterns
-    out_repr = pd.DataFrame(repr_patterns)
-    out_repr.index = cd.cnt.index
-
-    out_repr.to_csv(osp.join(args.out_dir,
-                             sampletag + "-representative" +\
-                             ".tsv"),
-                             header = True,
-                             index = True,
-                             sep = '\t'
-                             )
-
-    # visualize results if specified
-    if args.plot:
-
-        reprviz,_ = ut.plot_representative(repr_patterns,
-                                           crd = cd.real_crd,
-                                           ncols = args.n_cols,
-                                           pltargs = args.style_dict,
-                                           )
-
-        reproname = osp.join(args.out_dir,''.join([sampletag,
-                                                    '-representative.png',
-                                                    ],
-                                                    ))
-        reprviz.savefig(reproname)
-
-        family_plots = ut.plot_families(cd.cnt.loc[:,use_genes[0:args.n_genes]].values,
-                                        genes = use_genes[0:args.n_genes],
-                                        crd = cd.real_crd,
-                                        labels = family_labels,
-                                        ncols = args.n_cols,
-                                        pltargs = args.style_dict,
-                                        split_title = args.split_title,
-                                        )
-
-        for fl in range(len(family_plots)):
-            famoname = osp.join(args.out_dir,''.join([sampletag,
-                                                      '-family-',
-                                                       str(fl),
-                                                       '.png'],
-                                                        ))
-            family_plots[fl][0].savefig(famoname)
-
-    return None
-
-
 
 def topgenes(times_all,
              cd,
@@ -243,10 +137,10 @@ def main(args : ARGS,
                      args)
         # generates families 
         elif args.module == 'family':
-            family(times_all,cd,sampletag,args)
+            families(times_all,cd,sampletag,args)
     # conducts enrichment analysis
-    elif args.module == 'enrich':
-        enrich(args)
+    elif args.module == 'fea':
+        fea(args)
     else:
         print(["Not a valid module"])
 

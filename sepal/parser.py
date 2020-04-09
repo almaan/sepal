@@ -183,7 +183,7 @@ def make_parser():
                      )
 
     analyze_parser.add_argument("-st","--split_title",
-                         nargs = '+',
+                         nargs = 2,
                          default = None,
                          help = 'split title')
 
@@ -193,7 +193,7 @@ def make_parser():
                                                   formatter_class=arp.ArgumentDefaultsHelpFormatter)
     family_parser = analyze_subparser.add_parser("family",
                                                   formatter_class=arp.ArgumentDefaultsHelpFormatter)
-    enrich_parser = analyze_subparser.add_parser("enrich",
+    enrich_parser = analyze_subparser.add_parser("fea",
                                                   formatter_class=arp.ArgumentDefaultsHelpFormatter)
 
     topgene_parser.add_argument('-sd','--style_dict',
@@ -252,18 +252,34 @@ def make_parser():
                                 help = 'plot style as dict',
                                 )
 
-    enrich_parser.add_argument('-cl','--cluster_labels',
-                   required = True,
-                   type = str,
-                   help = 'path to cluster labels',
-                   )
+    enrich_parser.add_argument('-fl','--family_index',
+                                required = True,
+                                type = str,
+                                help = 'path to family indices',
+                                )
 
+    enrich_parser.add_argument('-or','--organism',
+                               required = False,
+                               default = "hsapiens",
+                               type = str,
+                               help = 'organism to query against.'\
+                               ' See g:Profiler'\
+                               " documentation for supported"\
+                               " organisms",
+                               )
 
     enrich_parser.add_argument("-dbs","--databases",
                      nargs = '+',
-                     default = ["GO_Biological_Process_2018"],
+                     default = ["GP:BP"],
                      help = ('database to use in enrichment'
                              ' analysis'))
+
+    enrich_parser.add_argument("-ltx","--latex",
+                                default = False,
+                                action = 'store_true',
+                                help = "save latex formatted table",
+                               )
+
 
     return parser
 
