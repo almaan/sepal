@@ -1,5 +1,16 @@
 #!/usr/bin/env python3
 
+"""CLI for Analysis of Results
+
+Provides modules for
+downstream analysis such
+as generation of pattern families,
+enrichment analysis, and visualization
+of top genes
+
+"""
+
+
 import argparse as arp
 import os.path as osp
 from os import mkdir
@@ -9,8 +20,8 @@ import json
 import numpy as np
 import pandas as pd
 
-#import enrichment as enr
 import utils as ut
+from utils import iprint,eprint,wprint
 import models as m
 from datasets import RawData
 
@@ -18,11 +29,10 @@ from argparse import Namespace as ARGS
 
 
 
-class SettingVars:
+class VARS:
     """default variables"""
-    def __init__(self,):
-        self.SEL_COLUMN = 'average'
-        self.PVAL_EPS = 1e-273
+    SEL_COLUMN = 'average'
+    PVAL_EPS = 1e-273
 
 def enrich(args : ARGS,
            )->None:
@@ -34,9 +44,13 @@ def family(times_all :pd.DataFrame,
            args : ARGS,
            )->None:
 
-    st = SettingVars()
-    sort_genes = np.argsort(times_all[st.SEL_COLUMN].values)[::-1]
+    iprint("Assembling pattern families")
 
+    # sort profiles by their rank metric
+    sort_genes = np.argsort(times_all[VARS.SEL_COLUMN].values)[::-1]
+
+    # select number of profiles
+    # to construct eigenspace basis from
     if args.n_base_genes is None:
         args.n_base_genes = np.min((args.n_genes*2,
                                     times_all.shape[0]))
@@ -44,21 +58,27 @@ def family(times_all :pd.DataFrame,
         args.n_base_genes = np.min((args.n_base_genes,
                                     times_all.shape[0]))
 
-
+    # get sorted rank metric
     use_genes = times_all.index.values[sort_genes]
+    # adjust threshold
+    args.threshold = np.clip(args.threshold,0,100)
+    # if percentage is given adjust
+    # to fraction
+    if args.threshold > 1:
+        args.threshold *= 0.01
 
-    args.threshold = np.clip(args.threshold,0,1)
+    # get families and representative motifs
     family_labels,repr_patterns = ut.get_families(cd.cnt.loc[:,use_genes].values,
                                     n_base = args.n_base_genes,
                                     n_sort = args.n_genes,
                                     threshold = args.threshold,
                                     )
-
+    # save family assortment
     families = pd.DataFrame(family_labels,
                             index = use_genes[0:args.n_genes],
                             columns = ['family'],
                             )
-
+    
     out_fl_pth = osp.join(args.out_dir,args.out_dir,'-'.join([sampletag,
                                                             'family',
                                                             'index.tsv']
@@ -68,7 +88,7 @@ def family(times_all :pd.DataFrame,
                     header = True,
                     index = True,
                     )
-
+    # save representative patterns
     out_repr = pd.DataFrame(repr_patterns)
     out_repr.index = cd.cnt.index
 
@@ -80,6 +100,7 @@ def family(times_all :pd.DataFrame,
                              sep = '\t'
                              )
 
+    # visualize results if specified
     if args.plot:
 
         reprviz,_ = ut.plot_representative(repr_patterns,
@@ -115,22 +136,28 @@ def family(times_all :pd.DataFrame,
 
 
 
-def topgenes(times_all,cd,sampletag,args):
+def topgenes(times_all,
+             cd,
+             sampletag,
+             args):
 
-    st = SettingVars()
-
-    sort_genes = np.argsort(times_all[st.SEL_COLUMN].values)[::-1]
-
+    iprint("Visualizing top profiles")
     if args.pval:
-        times_all[st.SEL_COLUMN] = -np.log10(times_all[st.SEL_COLUMN].values.flatten() + \
-            st.PVAL_EPS)
+        times_all[VARS.SEL_COLUMN] = -np.log10(times_all[VARS.SEL_COLUMN].values.flatten() + \
+            VARS.PVAL_EPS)
 
+    # sort genes by rank metric
+    sort_genes = np.argsort(times_all[VARS.SEL_COLUMN].values)[::-1]
+
+    # automatically determine number
+    # of top genes to use
     if args.n_genes is None:
-        args.n_genes= ut.get_inflection_point(times_all[st.SEL_COLUMN].values[sort_genes])
+        args.n_genes= ut.get_inflection_point(times_all[VARS.SEL_COLUMN].values[sort_genes])
 
+    # create visualizations
     sel_genes = sort_genes[0:int(args.n_genes)]
     top_genes = times_all.index.values[sel_genes]
-    top_times = times_all[st.SEL_COLUMN][sel_genes]
+    top_times = times_all[VARS.SEL_COLUMN][sel_genes]
 
     fig,ax = ut.plot_profiles(cd.cnt.loc[:,top_genes],
                               cd.real_crd,
@@ -142,49 +169,82 @@ def topgenes(times_all,cd,sampletag,args):
                               split_title = args.split_title,
                               pval = args.pval,
                               )
-
+    # save visualization
     fig.savefig(osp.join(args.out_dir,'-'.join([sampletag,
                                                'top_genes',
                                                 'diffusion-times.png']
                                                  )))
     return None
 
-def main(args):
-    st = SettingVars()
+def main(args : ARGS,
+         )->None:
+    """Analyze results
 
+    Provides means for
+    inspection and downstream
+    analysis of the spatial
+    patterns identified
+
+    Parameters:
+    ----------
+    args : ARGS
+       parsed arguments from argparse
+
+
+    """
+
+    # set tag for sample
     sampletag = '.'.join(osp.basename(args.count_data).split('.')[0:-1])
 
+    # create output directory
+    # if non-existing
     if not osp.isdir(args.out_dir):
         mkdir(args.out_dir)
 
 
+    # execute specified analysis
+    if args.module in ['inspect','family']:
+        iprint("will analyze : \n >CNT :"\
+               "{} \n >RANKS : {}".format(args.count_data,
+                                         args.results))
+        if args.array is None:
+            eprint("Please specify array type")
+            sys.exit(-1)
 
-    if args.module in ['topgenes','family']:
+        # load results
         times_all = pd.read_csv(args.results,
                                 sep = '\t',
                                 header = 0,
                                 index_col = 0)
 
+        # set array type
         Data = {"1k": m.ST1K,
                 "2k": m.ST2K,
                 "visium" : m.VisiumData,
                 "unstructured": m.UnstructuredData,
                 }
 
-
-
+        # read count data
         cdata = RawData(args.count_data,
                         args.transpose)
 
+        # convert count data to compatible
+        # CountData object
         cd = Data[args.array](cdata,
                               eps = 0.2,
                               normalize = False,
                               )
 
-        if args.module == 'topgenes':
-            topgenes(times_all,cd,sampletag,args)
+        # visualizes top profiles
+        if args.module == 'inspect':
+            topgenes(times_all,
+                     cd,
+                     sampletag,
+                     args)
+        # generates families 
         elif args.module == 'family':
             family(times_all,cd,sampletag,args)
+    # conducts enrichment analysis
     elif args.module == 'enrich':
         enrich(args)
     else:

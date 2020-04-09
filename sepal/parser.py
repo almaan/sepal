@@ -189,7 +189,7 @@ def make_parser():
 
     analyze_subparser = analyze_parser.add_subparsers(dest="module")
 
-    topgene_parser = analyze_subparser.add_parser("topgenes",
+    topgene_parser = analyze_subparser.add_parser("inspect",
                                                   formatter_class=arp.ArgumentDefaultsHelpFormatter)
     family_parser = analyze_subparser.add_parser("family",
                                                   formatter_class=arp.ArgumentDefaultsHelpFormatter)
@@ -253,8 +253,7 @@ def make_parser():
                                 )
 
     enrich_parser.add_argument('-cl','--cluster_labels',
-                   default = None,
-                   required = False,
+                   required = True,
                    type = str,
                    help = 'path to cluster labels',
                    )

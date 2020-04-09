@@ -1,16 +1,19 @@
 #!/usr/bin/env python3
 
+# warnings.filterwarnings("ignore",
+                        # category=FutureWarning)
 import parser as parser
 from analysis import main as analyze
 from run import main as run
 import sys
-
+from utils import banner
+import warnings
 
 def main()->None:
     prs = parser.make_parser()
     args = prs.parse_args()
     if args.command == 'run':
-        run(prs,args)
+        run(args)
     elif args.command == 'analyze':
         analyze(args)
     else:
@@ -20,6 +23,9 @@ def main()->None:
               )
 
 if __name__ == "__main__":
+    banner()
+    warnings.filterwarnings("ignore",
+                            category=FutureWarning)
     try:
         main()
     except KeyboardInterrupt:

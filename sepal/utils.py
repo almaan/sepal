@@ -10,6 +10,8 @@ in sepal
 import re
 import datetime
 
+import __init__
+
 import time as Time
 import re
 import sys
@@ -126,7 +128,7 @@ def filter_genes(mat : pd.DataFrame,
                  min_occur : int = 5,
                  min_expr : int = 0,
                  filter_spurious : bool = True,
-                 )->None:
+                 )->pd.DataFrame:
 
     """filter genes
 
@@ -793,13 +795,16 @@ def timestamp() -> str:
 
 
 def banner()->None:
-    string ="                    _   \n"\
-            "                  .\ /.  \n"\
-            "                 < ~O~ > \n"\
-            "┌─┐┌─┐┌─┐┌─┐┬     '/_\\'  \n"\
-            "└─┐├┤ ├─┘├─┤│     \ | /  \n"\
-            "└─┘└─┘┴  ┴ ┴┴─┘    \|/   "
-    print("\n" + string)
+    logo ="                    _   \n"\
+          "                  .\ /.  \n"\
+          "                 < ~O~ > \n"\
+          "┌─┐┌─┐┌─┐┌─┐┬     '/_\\'  \n"\
+          "└─┐├┤ ├─┘├─┤│     \ | /  \n"\
+          "└─┘└─┘┴  ┴ ┴┴─┘    \|/   "
+    # print("\n")
+    v = "Version {} : |  see https://github.com/almaan/sepal".format(__init__.__version__)
+    print( logo + "\n" + v)
+
 
 
 # def change_crd_index(df : pd.Index,

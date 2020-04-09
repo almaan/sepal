@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
 
+"""Models for diffusion simulation
+
+Methods related to the simulation
+and classes compatible with these
+
+
+"""
+
 import numpy as np
 import pandas as pd
 import os.path as osp
@@ -48,7 +56,7 @@ class CountData(ABC):
     """
     def __init__(self,
                  data : RawData,
-                 nn : int,
+                 nn : int = 4,
                  normalize : bool = False, 
                  eps : float = 0.1,
                  )-> None:
@@ -86,17 +94,6 @@ class CountData(ABC):
         self._remove_unsaturated()
 
     
-    # @property
-    # @classmethod
-    # @abstractmethod
-    # def edges(cls):
-    #     return NotImplementedError
-
-    # @property
-    # @abstractmethod
-    # def edges(self):
-    #     pass
-
     def _update_specs(self,
                       )->None:
         """Update specifications"""
@@ -813,6 +810,9 @@ def propagate(cd : CountData,
     each profile
 
     """
+
+    print(cd.nn)
+
     if num_workers is None:
         num_workers = int(cpu_count())
     else:
@@ -855,7 +855,7 @@ def propagate(cd : CountData,
     try:
         # will use tqdm progress bar
         # if package installed
-        import tqdm
+        from tqdm import tqdm
         iterable = tqdm(range(cd.G))
     except ImportError:
         iterable = range(cd.G)
