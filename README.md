@@ -12,6 +12,14 @@ This repo contains:
 
 ## Examples
 
+### CLI 
+
+
+Reference-style: 
+![CLI run example][run_ex]
+
+[run_ex] : https://github.com/almaan/sepal/blob/master/img/run-example.gif?raw=true
+
 ## Data
 
 ## Results
