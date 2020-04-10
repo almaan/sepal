@@ -33,7 +33,8 @@ from argparse import Namespace as ARGS
 def topgenes(times_all,
              cd,
              sampletag,
-             args):
+             args,
+             ):
 
     iprint("Visualizing top profiles")
     if args.pval:
@@ -50,9 +51,11 @@ def topgenes(times_all,
 
     # create visualizations
     sel_genes = sort_genes[0:int(args.n_genes)]
-    top_genes = times_all.index.values[sel_genes]
-    top_times = times_all[VARS.SEL_COLUMN][sel_genes]
+    top_genes = times_all.index[sel_genes]
+    top_genes = top_genes.intersection(cd.cnt.columns)
+    top_times = times_all.loc[top_genes,VARS.SEL_COLUMN]
 
+    
     fig,ax = ut.plot_profiles(cd.cnt.loc[:,top_genes],
                               cd.real_crd,
                               top_times,
@@ -120,7 +123,10 @@ def main(args : ARGS,
 
         # read count data
         cdata = RawData(args.count_data,
-                        args.transpose)
+                        args.transpose,
+                        only_include = times_all.index,
+                        )
+
 
         # convert count data to compatible
         # CountData object

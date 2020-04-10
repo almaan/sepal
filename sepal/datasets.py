@@ -31,12 +31,16 @@ class RawData:
     transpose : bool
         include to transpose count
         data
+    only_include: pd.Index
+        list of genes to only include
+
 
     """
 
     def __init__(self,
                  pth : str,
                  transpose : bool = False,
+                 only_include : pd.Index = pd.Index([]),
                  ) -> None:
 
         self.supported_ext = ["h5ad",
@@ -68,6 +72,7 @@ class RawData:
             self.read_data(pth,
                            self.ext,
                            transpose,
+                           only_include,
                            )
 
     def get_ext(self,
@@ -100,6 +105,7 @@ class RawData:
                   pth : str,
                   ext : str,
                   transpose : bool = False,
+                  only_include : pd.Index = pd.Index([]),
                   )-> None:
         """Read provided count data
 
@@ -112,6 +118,8 @@ class RawData:
         transpose: bool
             set as true if count data should
             be transposed.
+        only_include: pd.Index
+            list of genes to only include
 
         """
 
@@ -124,7 +132,7 @@ class RawData:
                               sep = sep[ext],
                               header = 0,
                               index_col = 0,
-                              )
+                             )
 
             if transpose:
                 tmp  = tmp.T
@@ -184,6 +192,11 @@ class RawData:
 
         else:
             print("[ERROR] : Something went wrong when loading data")
+
+        if len(only_include) > 0:
+            inter = self._cnt.columns.intersection(only_include)
+            self._cnt = self._cnt.loc[:,inter]
+
 
         self.shape = self._cnt.shape
 
