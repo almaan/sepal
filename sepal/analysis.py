@@ -137,7 +137,10 @@ def main(args : ARGS,
                      args)
         # generates families 
         elif args.module == 'family':
-            families(times_all,cd,sampletag,args)
+            families(times_all,
+                     cd,
+                     sampletag,
+                     args)
     # conducts enrichment analysis
     elif args.module == 'fea':
         fea(args)

@@ -142,6 +142,8 @@ def main(args : ARGS,
                            args.split_title,
                            )
 
+    enr['family'] += args.start_at
+
     obase = osp.basename(args.family_index)
     obase = obase.replace("family-index",
                           "FEA")

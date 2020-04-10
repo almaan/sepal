@@ -1,0 +1,83 @@
+	family	native	name	p_value	source	intersection_size
+1	1	GO:0007399	nervous system development	5.8778653082058115e-08	GO:BP	40
+2	1	GO:0022008	neurogenesis	6.382997969556454e-08	GO:BP	33
+3	1	GO:0032502	developmental process	6.629987181263403e-08	GO:BP	69
+4	1	GO:0048856	anatomical structure development	2.332162507966806e-07	GO:BP	65
+5	1	GO:0048699	generation of neurons	1.409125213688694e-06	GO:BP	30
+6	1	GO:0030182	neuron differentiation	2.4266762444932186e-06	GO:BP	28
+7	1	GO:0048666	neuron development	3.545361194360262e-06	GO:BP	25
+8	1	GO:0048731	system development	3.9973136942732305e-06	GO:BP	56
+9	1	GO:0031175	neuron projection development	9.173765611271375e-06	GO:BP	23
+10	1	GO:0007275	multicellular organism development	9.470706834176709e-06	GO:BP	59
+11	1	GO:0009653	anatomical structure morphogenesis	1.972741382252393e-05	GO:BP	39
+12	1	GO:0048468	cell development	2.0465099876330762e-05	GO:BP	34
+13	1	GO:0030154	cell differentiation	2.246739979082242e-05	GO:BP	50
+14	1	GO:0120036	plasma membrane bounded cell projection organization	7.306453985998701e-05	GO:BP	27
+15	1	GO:0009888	tissue development	9.632625751258089e-05	GO:BP	32
+16	1	GO:0048869	cellular developmental process	0.00010428739453642787	GO:BP	50
+17	1	GO:0030030	cell projection organization	0.0001226271703504565	GO:BP	27
+18	1	GO:0016049	cell growth	0.00016230127287996667	GO:BP	15
+19	1	GO:0048812	neuron projection morphogenesis	0.00026119524391615977	GO:BP	17
+20	1	GO:0032501	multicellular organismal process	0.0003315608698091787	GO:BP	69
+21	1	GO:0120039	plasma membrane bounded cell projection morphogenesis	0.00034974683542296297	GO:BP	17
+22	1	GO:0048858	cell projection morphogenesis	0.0003796595756367504	GO:BP	17
+23	1	GO:0032990	cell part morphogenesis	0.0005673360090328594	GO:BP	17
+24	1	GO:0001558	regulation of cell growth	0.0009261239093169254	GO:BP	13
+25	1	GO:0040007	growth	0.0010807297973564425	GO:BP	20
+26	1	GO:0060560	developmental growth involved in morphogenesis	0.001524228378088838	GO:BP	10
+27	1	GO:0030308	negative regulation of cell growth	0.0016944354680513605	GO:BP	9
+28	1	GO:1901888	regulation of cell junction assembly	0.0017519980246994003	GO:BP	7
+29	1	GO:0040008	regulation of growth	0.0020817377683575713	GO:BP	16
+30	1	GO:0048667	cell morphogenesis involved in neuron differentiation	0.0021848973060313655	GO:BP	15
+31	1	GO:0051893	regulation of focal adhesion assembly	0.0022259580840634867	GO:BP	6
+32	1	GO:0090109	regulation of cell-substrate junction assembly	0.0022259580840634867	GO:BP	6
+33	1	GO:0150116	regulation of cell-substrate junction organization	0.0022259580840634867	GO:BP	6
+34	1	GO:0016043	cellular component organization	0.0030149041277681603	GO:BP	59
+35	1	GO:0071840	cellular component organization or biogenesis	0.0032908048820838643	GO:BP	60
+36	1	GO:0006928	movement of cell or subcellular component	0.004357309666563473	GO:BP	30
+37	1	GO:0007409	axonogenesis	0.004808179560958822	GO:BP	13
+38	1	GO:0051129	negative regulation of cellular component organization	0.0055928732594782956	GO:BP	16
+39	1	GO:0000904	cell morphogenesis involved in differentiation	0.007961996800371072	GO:BP	16
+40	1	GO:0048513	animal organ development	0.00852891382533458	GO:BP	40
+41	1	GO:0000902	cell morphogenesis	0.009010141847341589	GO:BP	19
+42	1	GO:0032989	cellular component morphogenesis	0.009717040895614572	GO:BP	20
+43	1	GO:0042221	response to chemical	0.010025601450435915	GO:BP	48
+44	1	GO:0048041	focal adhesion assembly	0.011312743562789569	GO:BP	6
+45	1	GO:0061564	axon development	0.012292765839970342	GO:BP	13
+46	1	GO:0040011	locomotion	0.014161004377385147	GO:BP	27
+47	1	GO:0048771	tissue remodeling	0.014777592069669825	GO:BP	8
+48	1	GO:0014033	neural crest cell differentiation	0.015885509135976063	GO:BP	6
+49	1	GO:0048843	negative regulation of axon extension involved in axon guidance	0.01753754534322597	GO:BP	4
+50	1	GO:0051128	regulation of cellular component organization	0.017550995100336326	GO:BP	31
+51	1	GO:0048523	negative regulation of cellular process	0.018119384641640847	GO:BP	48
+52	1	GO:0045926	negative regulation of growth	0.020459860860522188	GO:BP	9
+53	1	GO:0001755	neural crest cell migration	0.020527449892024457	GO:BP	5
+54	1	GO:1902668	negative regulation of axon guidance	0.02412518800542134	GO:BP	4
+55	1	GO:2000026	regulation of multicellular organismal development	0.027605391160906493	GO:BP	28
+56	1	GO:0010771	negative regulation of cell morphogenesis involved in differentiation	0.029513852784284453	GO:BP	6
+57	1	GO:0048585	negative regulation of response to stimulus	0.03092711831089194	GO:BP	24
+58	1	GO:0150115	cell-substrate junction organization	0.03127868752506539	GO:BP	6
+59	1	GO:0007044	cell-substrate junction assembly	0.03127868752506539	GO:BP	6
+60	1	GO:0016477	cell migration	0.03312974939217927	GO:BP	23
+61	1	GO:0030334	regulation of cell migration	0.040957698406296796	GO:BP	17
+62	1	GO:0010721	negative regulation of cell development	0.04114857407601227	GO:BP	10
+63	1	GO:0048729	tissue morphogenesis	0.041423786093359054	GO:BP	14
+64	1	GO:0048841	regulation of axon extension involved in axon guidance	0.04252604023473603	GO:BP	4
+65	1	GO:0060485	mesenchyme development	0.04293522092575608	GO:BP	9
+66	1	GO:0010977	negative regulation of neuron projection development	0.04368657431388224	GO:BP	7
+67	1	GO:0090084	negative regulation of inclusion body assembly	0.045162309541557435	GO:BP	3
+68	1	GO:0007411	axon guidance	0.0479933440158345	GO:BP	9
+69	1	GO:0032879	regulation of localization	0.048017073848163554	GO:BP	33
+70	2	GO:0046649	lymphocyte activation	4.795319232843205e-06	GO:BP	11
+71	2	GO:0001775	cell activation	4.256175402444631e-05	GO:BP	13
+72	2	GO:0045321	leukocyte activation	0.000127289288554119	GO:BP	12
+73	2	GO:0002376	immune system process	0.0016849608849922237	GO:BP	16
+74	2	GO:0002682	regulation of immune system process	0.016537542265139992	GO:BP	11
+75	2	GO:0002694	regulation of leukocyte activation	0.027282151234139265	GO:BP	7
+76	2	GO:0050865	regulation of cell activation	0.042686259103276	GO:BP	7
+77	2	GO:0048872	homeostasis of number of cells	0.04504966273454495	GO:BP	5
+78	2	GO:0002684	positive regulation of immune system process	0.04670279245651899	GO:BP	9
+79	3	GO:0030199	collagen fibril organization	0.0016548105333954119	GO:BP	3
+80	3	GO:0030168	platelet activation	0.041279803924241625	GO:BP	3
+81	4	GO:0002640	regulation of immunoglobulin biosynthetic process	0.049863573263574705	GO:BP	1
+82	4	GO:0002642	positive regulation of immunoglobulin biosynthetic process	0.049863573263574705	GO:BP	1

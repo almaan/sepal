@@ -290,6 +290,12 @@ def make_parser():
                                 action = 'store_true',
                                 help = "save markdown formatted table",
                                )
+    enrich_parser.add_argument("-sa","--start_at",
+                                default = 0,
+                                type = int,
+                                help = "start family enumeration at",
+                               )
+
 
 
 

@@ -19,10 +19,7 @@ spark@lib_size <- apply(spark@counts,2,sum)
 spark <- spark.vc(spark, covariates = NULL, lib_size = spark@lib_size, 
                   num_core = 8, verbose = T, fit.maxiter = 500)
 spark <- spark.test(spark, check_positive = T, verbose = T)
-
-
 ordr <- order(as.numeric(spark@res_mtest[,c("adjusted_pvalue")]))
-## top20 <- head(spark@res_mtest[ordr,c("combined_pvalue","adjusted_pvalue")],n=20)
 out <- spark@res_mtest[ordr,]
 
 opth = "/home/alma/w-projects/spatential/res/publication/spark/spark-mob.tsv"

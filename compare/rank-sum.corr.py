@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 import os.path as osp
-from scipy.stats import spearmanr
+from scipy.stats import spearmanr,pearsonr
 
 
 def match(sort_vals,
@@ -43,7 +43,9 @@ def process_methods(methods):
     genes = None
     met_list = {}
     for met,vals in methods.items():
-        _tmp = pd.read_csv(vals['file'],sep = '\t',header = 0,index_col = 0)
+        _tmp = pd.read_csv(vals['file'],sep = vals['sep'],header = 0,index_col = 0)
+        if 'genes' in vals.keys():
+            _tmp.index = _tmp[vals['genes']].values
         _tmp = _tmp[[vals['column']]]
         print(_tmp.head())
 
@@ -74,12 +76,17 @@ cnt = pd.read_csv(cnt_pth, header = 0, index_col = 0, sep = '\t')
 
 methods = dict(sepal = dict( file = "/home/alma/w-projects/spatential/res/publication/mob/20200407115358366240-top-diffusion-times.tsv",
                                column = "average",
+                             sep = '\t',
                                ),
-               spatialDE = dict(file = "/home/alma/w-projects/spatential/res/publication/spatialDE/spatialDE-mob.tsv",
+               # spatialDE = dict(file = "/home/alma/w-projects/spatential/res/publication/spatialDE/spatialDE-mob.tsv",
+               spatialDE = dict(file = "/tmp/MOB_final_results.csv",
                                   column = 'qval',
+                                  sep = ',',
+                                   genes = 'g',
                                   ),
                SPARK = dict(file = "/home/alma/w-projects/spatential/res/publication/spark/spark-mob.tsv",
-                              column = 'adjusted_pvalue'
+                              column = 'adjusted_pvalue',
+                            sep = '\t',
                               ),
                )
 

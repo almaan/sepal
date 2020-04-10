@@ -1,0 +1,88 @@
+\begin{tabular}{lrllrlr}
+\toprule
+{} &  family &      native &                                               name &       p\_value & source &  intersection\_size \\
+\midrule
+1  &       1 &  GO:0007399 &                         nervous system development &  5.877865e-08 &  GO:BP &                 40 \\
+2  &       1 &  GO:0022008 &                                       neurogenesis &  6.382998e-08 &  GO:BP &                 33 \\
+3  &       1 &  GO:0032502 &                              developmental process &  6.629987e-08 &  GO:BP &                 69 \\
+4  &       1 &  GO:0048856 &                   anatomical structure development &  2.332163e-07 &  GO:BP &                 65 \\
+5  &       1 &  GO:0048699 &                              generation of neurons &  1.409125e-06 &  GO:BP &                 30 \\
+6  &       1 &  GO:0030182 &                             neuron differentiation &  2.426676e-06 &  GO:BP &                 28 \\
+7  &       1 &  GO:0048666 &                                 neuron development &  3.545361e-06 &  GO:BP &                 25 \\
+8  &       1 &  GO:0048731 &                                 system development &  3.997314e-06 &  GO:BP &                 56 \\
+9  &       1 &  GO:0031175 &                      neuron projection development &  9.173766e-06 &  GO:BP &                 23 \\
+10 &       1 &  GO:0007275 &                 multicellular organism development &  9.470707e-06 &  GO:BP &                 59 \\
+11 &       1 &  GO:0009653 &                 anatomical structure morphogenesis &  1.972741e-05 &  GO:BP &                 39 \\
+12 &       1 &  GO:0048468 &                                   cell development &  2.046510e-05 &  GO:BP &                 34 \\
+13 &       1 &  GO:0030154 &                               cell differentiation &  2.246740e-05 &  GO:BP &                 50 \\
+14 &       1 &  GO:0120036 &  plasma membrane bounded cell projection organi... &  7.306454e-05 &  GO:BP &                 27 \\
+15 &       1 &  GO:0009888 &                                 tissue development &  9.632626e-05 &  GO:BP &                 32 \\
+16 &       1 &  GO:0048869 &                     cellular developmental process &  1.042874e-04 &  GO:BP &                 50 \\
+17 &       1 &  GO:0030030 &                       cell projection organization &  1.226272e-04 &  GO:BP &                 27 \\
+18 &       1 &  GO:0016049 &                                        cell growth &  1.623013e-04 &  GO:BP &                 15 \\
+19 &       1 &  GO:0048812 &                    neuron projection morphogenesis &  2.611952e-04 &  GO:BP &                 17 \\
+20 &       1 &  GO:0032501 &                   multicellular organismal process &  3.315609e-04 &  GO:BP &                 69 \\
+21 &       1 &  GO:0120039 &  plasma membrane bounded cell projection morpho... &  3.497468e-04 &  GO:BP &                 17 \\
+22 &       1 &  GO:0048858 &                      cell projection morphogenesis &  3.796596e-04 &  GO:BP &                 17 \\
+23 &       1 &  GO:0032990 &                            cell part morphogenesis &  5.673360e-04 &  GO:BP &                 17 \\
+24 &       1 &  GO:0001558 &                          regulation of cell growth &  9.261239e-04 &  GO:BP &                 13 \\
+25 &       1 &  GO:0040007 &                                             growth &  1.080730e-03 &  GO:BP &                 20 \\
+26 &       1 &  GO:0060560 &     developmental growth involved in morphogenesis &  1.524228e-03 &  GO:BP &                 10 \\
+27 &       1 &  GO:0030308 &                 negative regulation of cell growth &  1.694435e-03 &  GO:BP &                  9 \\
+28 &       1 &  GO:1901888 &               regulation of cell junction assembly &  1.751998e-03 &  GO:BP &                  7 \\
+29 &       1 &  GO:0040008 &                               regulation of growth &  2.081738e-03 &  GO:BP &                 16 \\
+30 &       1 &  GO:0048667 &  cell morphogenesis involved in neuron differen... &  2.184897e-03 &  GO:BP &                 15 \\
+31 &       1 &  GO:0051893 &              regulation of focal adhesion assembly &  2.225958e-03 &  GO:BP &                  6 \\
+32 &       1 &  GO:0090109 &     regulation of cell-substrate junction assembly &  2.225958e-03 &  GO:BP &                  6 \\
+33 &       1 &  GO:0150116 &  regulation of cell-substrate junction organiza... &  2.225958e-03 &  GO:BP &                  6 \\
+34 &       1 &  GO:0016043 &                    cellular component organization &  3.014904e-03 &  GO:BP &                 59 \\
+35 &       1 &  GO:0071840 &      cellular component organization or biogenesis &  3.290805e-03 &  GO:BP &                 60 \\
+36 &       1 &  GO:0006928 &          movement of cell or subcellular component &  4.357310e-03 &  GO:BP &                 30 \\
+37 &       1 &  GO:0007409 &                                       axonogenesis &  4.808180e-03 &  GO:BP &                 13 \\
+38 &       1 &  GO:0051129 &  negative regulation of cellular component orga... &  5.592873e-03 &  GO:BP &                 16 \\
+39 &       1 &  GO:0000904 &     cell morphogenesis involved in differentiation &  7.961997e-03 &  GO:BP &                 16 \\
+40 &       1 &  GO:0048513 &                           animal organ development &  8.528914e-03 &  GO:BP &                 40 \\
+41 &       1 &  GO:0000902 &                                 cell morphogenesis &  9.010142e-03 &  GO:BP &                 19 \\
+42 &       1 &  GO:0032989 &                   cellular component morphogenesis &  9.717041e-03 &  GO:BP &                 20 \\
+43 &       1 &  GO:0042221 &                               response to chemical &  1.002560e-02 &  GO:BP &                 48 \\
+44 &       1 &  GO:0048041 &                            focal adhesion assembly &  1.131274e-02 &  GO:BP &                  6 \\
+45 &       1 &  GO:0061564 &                                   axon development &  1.229277e-02 &  GO:BP &                 13 \\
+46 &       1 &  GO:0040011 &                                         locomotion &  1.416100e-02 &  GO:BP &                 27 \\
+47 &       1 &  GO:0048771 &                                  tissue remodeling &  1.477759e-02 &  GO:BP &                  8 \\
+48 &       1 &  GO:0014033 &                  neural crest cell differentiation &  1.588551e-02 &  GO:BP &                  6 \\
+49 &       1 &  GO:0048843 &  negative regulation of axon extension involved... &  1.753755e-02 &  GO:BP &                  4 \\
+50 &       1 &  GO:0051128 &      regulation of cellular component organization &  1.755100e-02 &  GO:BP &                 31 \\
+51 &       1 &  GO:0048523 &            negative regulation of cellular process &  1.811938e-02 &  GO:BP &                 48 \\
+52 &       1 &  GO:0045926 &                      negative regulation of growth &  2.045986e-02 &  GO:BP &                  9 \\
+53 &       1 &  GO:0001755 &                        neural crest cell migration &  2.052745e-02 &  GO:BP &                  5 \\
+54 &       1 &  GO:1902668 &               negative regulation of axon guidance &  2.412519e-02 &  GO:BP &                  4 \\
+55 &       1 &  GO:2000026 &  regulation of multicellular organismal develop... &  2.760539e-02 &  GO:BP &                 28 \\
+56 &       1 &  GO:0010771 &  negative regulation of cell morphogenesis invo... &  2.951385e-02 &  GO:BP &                  6 \\
+57 &       1 &  GO:0048585 &        negative regulation of response to stimulus &  3.092712e-02 &  GO:BP &                 24 \\
+58 &       1 &  GO:0150115 &               cell-substrate junction organization &  3.127869e-02 &  GO:BP &                  6 \\
+59 &       1 &  GO:0007044 &                   cell-substrate junction assembly &  3.127869e-02 &  GO:BP &                  6 \\
+60 &       1 &  GO:0016477 &                                     cell migration &  3.312975e-02 &  GO:BP &                 23 \\
+61 &       1 &  GO:0030334 &                       regulation of cell migration &  4.095770e-02 &  GO:BP &                 17 \\
+62 &       1 &  GO:0010721 &            negative regulation of cell development &  4.114857e-02 &  GO:BP &                 10 \\
+63 &       1 &  GO:0048729 &                               tissue morphogenesis &  4.142379e-02 &  GO:BP &                 14 \\
+64 &       1 &  GO:0048841 &  regulation of axon extension involved in axon ... &  4.252604e-02 &  GO:BP &                  4 \\
+65 &       1 &  GO:0060485 &                             mesenchyme development &  4.293522e-02 &  GO:BP &                  9 \\
+66 &       1 &  GO:0010977 &  negative regulation of neuron projection devel... &  4.368657e-02 &  GO:BP &                  7 \\
+67 &       1 &  GO:0090084 &     negative regulation of inclusion body assembly &  4.516231e-02 &  GO:BP &                  3 \\
+68 &       1 &  GO:0007411 &                                      axon guidance &  4.799334e-02 &  GO:BP &                  9 \\
+69 &       1 &  GO:0032879 &                         regulation of localization &  4.801707e-02 &  GO:BP &                 33 \\
+70 &       2 &  GO:0046649 &                              lymphocyte activation &  4.795319e-06 &  GO:BP &                 11 \\
+71 &       2 &  GO:0001775 &                                    cell activation &  4.256175e-05 &  GO:BP &                 13 \\
+72 &       2 &  GO:0045321 &                               leukocyte activation &  1.272893e-04 &  GO:BP &                 12 \\
+73 &       2 &  GO:0002376 &                              immune system process &  1.684961e-03 &  GO:BP &                 16 \\
+74 &       2 &  GO:0002682 &                regulation of immune system process &  1.653754e-02 &  GO:BP &                 11 \\
+75 &       2 &  GO:0002694 &                 regulation of leukocyte activation &  2.728215e-02 &  GO:BP &                  7 \\
+76 &       2 &  GO:0050865 &                      regulation of cell activation &  4.268626e-02 &  GO:BP &                  7 \\
+77 &       2 &  GO:0048872 &                     homeostasis of number of cells &  4.504966e-02 &  GO:BP &                  5 \\
+78 &       2 &  GO:0002684 &       positive regulation of immune system process &  4.670279e-02 &  GO:BP &                  9 \\
+79 &       3 &  GO:0030199 &                       collagen fibril organization &  1.654811e-03 &  GO:BP &                  3 \\
+80 &       3 &  GO:0030168 &                                platelet activation &  4.127980e-02 &  GO:BP &                  3 \\
+81 &       4 &  GO:0002640 &  regulation of immunoglobulin biosynthetic process &  4.986357e-02 &  GO:BP &                  1 \\
+82 &       4 &  GO:0002642 &  positive regulation of immunoglobulin biosynth... &  4.986357e-02 &  GO:BP &                  1 \\
+\bottomrule
+\end{tabular}

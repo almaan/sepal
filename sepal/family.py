@@ -331,7 +331,7 @@ def get_eigenpatterns( mat : np.ndarray,
     return (evecs,loads)
 
 
-def get_families(counts : np.ndarray,
+def get_families(raw_counts : np.ndarray,
                  n_base : int = 500,
                  n_sort : int = 100,
                  threshold : float = 0.9,
@@ -367,6 +367,8 @@ def get_families(counts : np.ndarray,
     of each representative pattern.
 
     """
+
+    counts = ut.safe_div(raw_counts,raw_counts.sum(axis=1,keepdims=True))
 
     # get eigenpatterns and projections
     epats,loads = get_eigenpatterns(counts[:,0:n_base],
