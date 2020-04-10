@@ -125,7 +125,6 @@ where we for example see that Family 2 is enriched for several processes related
 
 |    |   family | native     | name                                          |     p_value | source   |   intersection_size |
 |---:|---------:|:-----------|:----------------------------------------------|------------:|:---------|--------------------:|
-|  1 |        0 | GO:0050769 | positive regulation of neurogenesis           | 0.0367194   | GO:BP    |                   4 |
 |  2 |        2 | GO:0007399 | nervous system development                    | 0.00035977  | GO:BP    |                  26 |
 |  3 |        2 | GO:0050773 | regulation of dendrite development            | 0.000835883 | GO:BP    |                   8 |
 |  4 |        2 | GO:0048167 | regulation of synaptic plasticity             | 0.00196494  | GO:BP    |                   8 |
