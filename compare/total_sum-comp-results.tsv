@@ -1,0 +1,8 @@
+\begin{tabular}{l|c|c|c}
+\toprule
+{} &         sepal &     SpatialDE &          SPARK \\
+\midrule
+spearman (\$\textbackslash rho\$) &  1.398595e-01 & -1.876725e-01 &  -2.576362e-01 \\
+p-value           &  3.561635e-48 &  6.008244e-86 &  7.838931e-163 \\
+\bottomrule
+\end{tabular}
