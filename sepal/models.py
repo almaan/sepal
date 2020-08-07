@@ -23,7 +23,7 @@ from joblib import Parallel, delayed
 from multiprocessing import cpu_count
 
 
-from typing import Tuple,Union,List
+from typing import Tuple,Union,List, Optional
 
 from sepal.utils import eprint,wprint,iprint
 import sepal.utils as ut
@@ -103,15 +103,6 @@ class CountData(ABC):
         # set number of profiles
         self.G = self.cnt.shape[1]
 
-    # TODO : remove method
-    # def get_crd(self,
-    #             idx : pd.Index,
-    #             )->np.ndarray:
-
-    #     crd = np.array([[float(x.replace('X','')) for \
-    #                     x in y.split('x') ] for\
-    #                     y in idx])
-    #     return crd
 
     def _scale_crd(self,
                    )->None:
@@ -269,13 +260,6 @@ class CountData(ABC):
         
         return nbrs.astype(int)
 
-    # def get_allnbr_cnt(self,
-    #                         )-> Tuple[np.ndarray,...]:
-
-    #     idxs = self.get_allnbr_idx(self.saturated)
-
-    #     return (self.cnt.values[self.saturated,:],
-    #             self.cnt.values[idxs,:])
 
     def _getpos(self,
                 origin_idx : int,
@@ -774,9 +758,10 @@ def propagate(cd : CountData,
               stopafter : int = int(1e10),
               normalize : bool = True,
               diffusion_rate : Union[float,np.ndarray] = 1.0,
-              num_workers : int = None,
+              num_workers : Optional[int] = None,
               scale : bool = False,
               )-> pd.DataFrame:
+
     """Simulate Diffusion
 
     Simulates diffusion by propagating
@@ -925,12 +910,12 @@ def stepping(idx : int,
             
         """
 
-        maxDelta = np.inf
         time  = 0.0
+        new_H = 1
+        old_H = 0
 
-        old_maxDelta = 1
-
-        while np.abs(old_maxDelta - maxDelta ) > thrs and conc[cd.saturated].sum() > 0:
+        while np.abs(new_H - old_H) >\
+              thrs and conc[cd.saturated].sum() > 0:
             # stop if convergence is not reached
             if time / dt > stopafter:
                 genename = cd.cnt.columns[idx]
@@ -940,7 +925,7 @@ def stepping(idx : int,
                 break
 
             # update old entropy value
-            old_maxDelta = maxDelta
+            old_H = new_H
             # update time
             time +=dt
 
@@ -960,7 +945,7 @@ def stepping(idx : int,
             # set values below zero to 0
             conc[conc < 0] = 0
             # compute entropy
-            maxDelta = entropy(conc[cd.saturated]) / cd.saturated.shape[0]
+            new_H = entropy(conc[cd.saturated]) / cd.saturated.shape[0]
 
         return time
 

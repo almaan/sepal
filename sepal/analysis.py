@@ -14,6 +14,7 @@ of top genes
 import argparse as arp
 import os.path as osp
 from os import mkdir
+import sys
 
 import json
 
@@ -38,16 +39,21 @@ def topgenes(times_all,
 
     iprint("Visualizing top profiles")
     if args.pval:
-        times_all[VARS.SEL_COLUMN] = -np.log10(times_all[VARS.SEL_COLUMN].values.flatten() + \
-            VARS.PVAL_EPS)
+        times_all[VARS.SEL_COLUMN] = -np.log10(times_all[VARS.SEL_COLUMN]\
+                                               .values.flatten() + \
+                                               VARS.PVAL_EPS)
 
     # sort genes by rank metric
-    sort_genes = np.argsort(times_all[VARS.SEL_COLUMN].values)[::-1]
+    sort_genes = np.argsort(times_all[VARS.SEL_COLUMN]\
+                            .values)[::-1]
 
     # automatically determine number
     # of top genes to use
     if args.n_genes is None:
-        args.n_genes= ut.get_inflection_point(times_all[VARS.SEL_COLUMN].values[sort_genes])
+        args.n_genes= ut.get_inflection_point(times_all[VARS.SEL_COLUMN]\
+                                              .values[sort_genes],
+                                              sigma = args.sigma,
+                                              )
 
     # create visualizations
     sel_genes = sort_genes[0:int(args.n_genes)]

@@ -1,4 +1,10 @@
 #!/usr/bin/env python3
+
+"""
+Parser for sepal
+
+"""
+
 import argparse as arp
 import json
 
@@ -10,9 +16,11 @@ def make_parser():
 
     subparsers = parser.add_subparsers(dest = 'command')
     run_parser = subparsers.add_parser("run",
-                                       formatter_class=arp.ArgumentDefaultsHelpFormatter)
+                                       formatter_class=arp\
+                                       .ArgumentDefaultsHelpFormatter)
     analyze_parser = subparsers.add_parser("analyze",
-                                        formatter_class=arp.ArgumentDefaultsHelpFormatter)
+                                        formatter_class=arp\
+                                           .ArgumentDefaultsHelpFormatter)
 
     run_parser.add_argument('-c','--count_files',
                      nargs = '+',
@@ -30,28 +38,70 @@ def make_parser():
                      help = 'transpose count matrix')
 
     run_parser.add_argument('-mo','--min_occurance',
-                     type = int,
-                     default = 5,
-                     help = ' '.join(['minimum number of spot',
-                                      'that gene has to occur within',
-                                      ],
-                                     )
-                     )
+                            type = int,
+                            default = 5,
+                            help = ' '.join(['minimum number of spot',
+                                             'that gene has to occur within',
+                                             ],
+                                            )
+                            )
 
     run_parser.add_argument('-mc','--min_counts',
-                     type = int,
-                     default = 20,
-                     help = ' '.join(['minimum number of total',
-                                      'counts for a gene',
-                                      ],
-                                     )
-                     )
+                            type = int,
+                            default = 20,
+                            help = ' '.join(['minimum number of total',
+                                             'counts for a gene',
+                                             ],
+                                            )
+                            )
+
+    run_parser.add_argument('-ks','--keep_spurious',
+                            default = False,
+                            action = "store_true",
+                            help = ' '.join(['include RP and MT',
+                                             'profiles',
+                                             ],
+                                            )
+                            )
+
 
     run_parser.add_argument('-dt','--time_step',
                      type = float,
                      default = 0.001,
                      help = ' '.join(['minimum number of total',
                                       'counts for a gene',
+                                      ],
+                                     )
+                     )
+
+    run_parser.add_argument('-eps','--threshold',
+                     type = float,
+                     default = 1e-8,
+                     help = ' '.join(['threshold (eps)',
+                                      'to use when assessing',
+                                      'convergence',
+                                      ],
+                                     )
+                     )
+
+    run_parser.add_argument('-dr','--diffusion_rate',
+                     type = float,
+                     default = 1,
+                     help = ' '.join(['Diffusion rate (D)',
+                                     'to use in simulations',
+                                      ],
+                                     )
+                     )
+
+
+    run_parser.add_argument('-nw','--num_workers',
+                     type = int,
+                     default = None,
+                     help = ' '.join(['number of workers',
+                                      'to use. If no number is',
+                                      'provided, the maximum',
+                                      'number of available workers',
+                                      'will be used.',
                                       ],
                                      )
                      )
@@ -65,6 +115,13 @@ def make_parser():
                                 ],
                      required = True,
                      help = 'array type')
+
+    run_parser.add_argument('-z','--timeit',
+                            default = False,
+                            action = "store_true",
+                            required = False,
+                            help = 'time analysis')
+
 
     # ----- ANALYSIS ------- #
     analyze_parser.add_argument('-c','--count_data',
@@ -99,70 +156,6 @@ def make_parser():
                      action = 'store_true',
                      )
 
-    # analyze_parser.add_argument('-al',
-    #                 '--analysis',
-    #                     nargs = '+',
-    #                     default = ['genes'],
-    #                     choices = ['genes',
-    #                                'cluster',
-    #                                'toprank',
-    #                                'enrich'])
-
-
-    # analyze_parser.add_argument('-tg','--top_genes',
-    #                  default = None,
-    #                  required = False,
-    #                   help = ("number of genes"
-    #                            " to visualize"
-    #                            ))
-
-    # analyze_parser.add_argument('-cg','--cluster_genes',
-    #                default = 50,
-    #                required = False,
-    #                type = int,
-    #                help = 'show number of genes',
-    #                )
-
-    # analyze_parser.add_argument('-cb','--cluster_base',
-    #                default = None,
-    #                required = False,
-    #                type = int,
-    #                help = 'show number of genes',
-    #                )
-
-    # analyze_parser.add_argument('-eps','--threshold',
-    #                   default = 0.995,
-    #                   type = float,
-    #                   help = 'threshold in clustering',
-    #                   )
-
-    # analyze_parser.add_argument('-cl','--cluster_labels',
-    #                default = None,
-    #                required = False,
-    #                type = str,
-    #                help = 'path to cluster labels',
-    #                )
-
-
-    # analyze_parser.add_argument("-dbs","--databases",
-    #                  nargs = '+',
-    #                  default = ["GO_Biological_Process_2018"],
-    #                  help = ('database to use in enrichment'
-    #                          ' analysis'))
-
-    # analyze_parser.add_argument("-pv","--pval",
-    #                  default = False,
-    #                  action = "store_true",
-    #                  help = ('values are pvals'))
-
-
-    # analyze_parser.add_argument('-sd','--style_dict',
-    #                 required = False,
-    #                 default = None,
-    #                 type = json.loads,
-    #                 help = 'plot style as dict',
-    #                 )
-
     analyze_parser.add_argument('-ss','--side_size',
                      required = False,
                      type = float,
@@ -187,14 +180,23 @@ def make_parser():
                          default = None,
                          help = 'split title')
 
+    analyze_parser.add_argument("-bw","--bandwidth",
+                                default = 10,
+                                type = float,
+                                help = "bandwidth for selection of top genes",
+                                )
+
     analyze_subparser = analyze_parser.add_subparsers(dest="module")
 
     topgene_parser = analyze_subparser.add_parser("inspect",
-                                                  formatter_class=arp.ArgumentDefaultsHelpFormatter)
+                                                  formatter_class=arp\
+                                                  .ArgumentDefaultsHelpFormatter)
     family_parser = analyze_subparser.add_parser("family",
-                                                  formatter_class=arp.ArgumentDefaultsHelpFormatter)
+                                                  formatter_class=arp\
+                                                 .ArgumentDefaultsHelpFormatter)
     enrich_parser = analyze_subparser.add_parser("fea",
-                                                  formatter_class=arp.ArgumentDefaultsHelpFormatter)
+                                                  formatter_class=arp\
+                                                 .ArgumentDefaultsHelpFormatter)
 
     topgene_parser.add_argument('-sd','--style_dict',
                                 required = False,
@@ -295,9 +297,6 @@ def make_parser():
                                 type = int,
                                 help = "start family enumeration at",
                                )
-
-
-
 
     return parser
 

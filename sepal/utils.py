@@ -221,8 +221,7 @@ def get_inflection_point(y : np.ndarray,
 
     # approximate second derivative
     # and smooth the approximation
-    f_d2 = gaussian_filter(np.gradient(np.gradient(f_times)),
-                           sigma)
+    f_d2 = np.gradient(np.gradient(f_times))
 
     # ignore the first instances
     # where f'' < 0. To avoid
@@ -230,7 +229,7 @@ def get_inflection_point(y : np.ndarray,
     first = np.argmax(f_d2 > 0)
     f_d2[0:first] = 1
     # find point where f''
-    # goes below zero
+    # is equal to or below zero
     ipoint = np.argmax(f_d2 <= 0)
 
     # return x value
@@ -511,3 +510,18 @@ def banner()->None:
 
 
 
+def format_timing(t_0 : float,
+                  t_end : float,
+                  res : pd.DataFrame,
+                  method : str,
+                  )->Dict[str,Union[str,float,int]]:
+
+    t_tot = t_end - t_0
+    n_genes = res.shape[0]
+
+    dct = dict(method = method,
+               genes = n_genes,
+               time = t_tot,
+               )
+
+    return dct

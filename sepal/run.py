@@ -16,7 +16,9 @@ CLI.
 import os
 import sys
 import json
+import time
 import os.path as osp
+import yaml
 import argparse as arp
 
 
@@ -79,7 +81,9 @@ def main(args : ARGS,
                                                             args.min_occurance))
             cdata.cnt = ut.filter_genes(cdata.cnt,
                                         min_occur = args.min_occurance,
-                                        min_expr = args.min_counts)
+                                        min_expr = args.min_counts,
+                                        filter_spurious = (not args.keep_spurious),
+                                        )
 
         # get dimensions
         n_spots,n_genes = cdata.shape
@@ -94,20 +98,43 @@ def main(args : ARGS,
 
         np.random.seed(1337)
         # propagate system in time
+        t_0 = time.time()
         times = m.propagate(cd,
-                            dt = args.time_step)
+                            dt = args.time_step,
+                            num_workers = args.num_workers,
+                            diffusion_rate = args.diffusion_rate,
+                            thrs = args.threshold,
+                            )
+        t_end = time.time()
+
+        timing_res = ut.format_timing(t_0,
+                                      t_end,
+                                      times,
+                                      method = "sepal",
+                                      )
 
         times.columns = pd.Index([sampletags[-1]])
+
+        if args.timeit:
+            with open(osp.join(args.out_dir,
+                               sampletags[-1] +"-timing.yaml"),"w") as f:
+
+                _ = yaml.dump(timing_res,f,default_flow_style = False)
+
 
         times_all.append(times)
 
     # Min max normalize diffusion times
-    times_all = pd.concat(times_all, axis = 1, join = 'inner').astype(float)
+    times_all = pd.concat(times_all,
+                          axis = 1,
+                          join = 'inner').astype(float)
     
     mn = times_all.values.min(axis = 0).reshape(1,-1)
     mx = times_all.values.max(axis = 0).reshape(1,-1)
 
-    times_all['average'] = ((times_all.values - mn) / (mx - mn)).mean(axis = 1)
+    avs = ut.safe_div(times_all.values - mn, mx - mn)
+    avs = avs.mean(axis = 1)
+    times_all['average'] = avs
 
     # save results
     if not osp.exists(args.out_dir):
