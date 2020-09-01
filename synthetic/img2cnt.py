@@ -46,7 +46,7 @@ def iprint( s : str) -> None :
 
 
 def make_count_matrix(img_files : list,
-                      n_friends : int = 3,
+                      n_children : int = 3,
                       mult_factors : Union[List,Tuple,np.ndarray] = [0.5,1,2],
                       pattern_av : int  = 8,
                       other_av : int = 2,
@@ -67,7 +67,7 @@ def make_count_matrix(img_files : list,
 
     n_patterns = len(img_files)
 
-    n_genes = n_patterns * (1 + n_friends*len(mult_factors))
+    n_genes = n_patterns * (1 + n_children*len(mult_factors))
     g_iter = iter(range(n_genes))
     n_spots = sizes[0][0] * sizes[0][1]
 
@@ -110,11 +110,11 @@ def make_count_matrix(img_files : list,
         gmat[:,next(g_iter)] = gene_vals
         gene_names.append("P" + str(num) + "-" + "O")
 
-        for friend in range(n_friends):
+        for child in range(n_children):
             for mult in mult_factors:
                 gmat[:,next(g_iter)] = (np.random.permutation(gene_vals) * mult).round()
                 gene_names.append("P" + str( num ) + \
-                                  "-F" + str(friend) + "-T" + str( mult ))
+                                  "-F" + str(child) + "-T" + str( mult ))
 
 
     spot_names = [str( xx ) + 'x' + \
@@ -161,12 +161,12 @@ def main()->None:
                      )
 
     prs.add_argument("-nf",
-                      "--n_friends",
+                      "--n_children",
                       type = int,
                       default = 3,
                       help = ("number of sections"
                               " based on true patterns"
-                              " to generate. n_friends"
+                              " to generate. n_children"
                               " copies for each multiple"
                               " will be formed."
                               ),
@@ -223,7 +223,7 @@ def main()->None:
         img_files = [img_files]
 
     count_matrix =  make_count_matrix(img_files = img_files,
-                                      n_friends = args.n_friends,
+                                      n_children = args.n_children,
                                       mult_factors = args.multiples,
                                       pattern_av = args.pattern_average,
                                       other_av = args.other_average,

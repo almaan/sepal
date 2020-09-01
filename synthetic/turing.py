@@ -62,7 +62,7 @@ def make_pattern(x_dim,y_dim,prms):
 
 def make_count_matrix(prms : dict,
                       n_patterns : int = 10,
-                      n_friends : int = 3,
+                      n_children : int = 3,
                       mult_factors : Union[List,Tuple,np.ndarray] = [0.5,1,2],
                       x_dim : int = 30,
                       y_dim : int = 30,
@@ -75,7 +75,7 @@ def make_count_matrix(prms : dict,
     x = x.flatten()
     y = y.flatten()
     
-    n_genes = n_patterns * (1 + n_friends*len(mult_factors))
+    n_genes = n_patterns * (1 + n_children*len(mult_factors))
     g_iter = iter(range(n_genes))
     n_spots = x_dim*y_dim
     gene_names = list()
@@ -89,11 +89,11 @@ def make_count_matrix(prms : dict,
 
         gene_names.append("P" + str(num) + "-" + "O")
 
-        for friend in range(n_friends):
+        for child in range(n_children):
             for mult in mult_factors:
                 gmat[:,next(g_iter)] = (np.random.permutation(gene_vals) * mult)
                 gene_names.append("P" + str( num ) + \
-                                "-F" + str(friend) + "-T" + str( mult ))
+                                "-F" + str(child) + "-T" + str( mult ))
 
     spot_names = [str( xx ) + 'x' + \
                   str( yy ) for \
@@ -114,7 +114,7 @@ def main():
     aa("-np","--n_patterns",
        default = 10)
 
-    aa("-nf","--n_friends",
+    aa("-nf","--n_children",
        default = 3)
 
     aa("-mf","--multiplication_factors",
@@ -171,7 +171,7 @@ def main():
 
     matrix = make_count_matrix(prms = parameters[param_set],
                                n_patterns = args.n_patterns,
-                               n_friends = args.n_friends,
+                               n_children = args.n_children,
                                mult_factors = args.multiplication_factors,
                                x_dim = args.x_dim,
                                y_dim = args.y_dim,
