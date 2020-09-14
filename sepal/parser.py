@@ -122,6 +122,12 @@ def make_parser():
                             required = False,
                             help = 'time analysis')
 
+    run_parser.add_argument("-ps","--pseudocount",
+                            type = float,
+                            default = 2.0,
+                            help = "pseudocount in normalization",
+                            )
+
 
     # ----- ANALYSIS ------- #
     analyze_parser.add_argument('-c','--count_data',
@@ -180,10 +186,16 @@ def make_parser():
                          default = None,
                          help = 'split title')
 
-    analyze_parser.add_argument("-bw","--bandwidth",
-                                default = 10,
+    analyze_parser.add_argument("-ps","--pseudocount",
                                 type = float,
-                                help = "bandwidth for selection of top genes",
+                                default = 2.0,
+                                help = "pseudocount in normalization",
+                                )
+
+    analyze_parser.add_argument("-sig","--sigma",
+                                default = 1.5,
+                                type = float,
+                                help = "sensitivity for selection of top genes",
                                 )
 
     analyze_subparser = analyze_parser.add_subparsers(dest="module")

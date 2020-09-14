@@ -30,6 +30,7 @@ def plot_representative(motifs : Dict[int,np.ndarray],
                         side_size : float = 300,
                         pltargs : dict = None,
                         normalize : bool = False ,
+                        pseudocount : float = 2,
                         )->Tuple[plt.Figure,plt.Axes]:
 
     """Plot representative motifs
@@ -53,6 +54,8 @@ def plot_representative(motifs : Dict[int,np.ndarray],
         normalize motif expression. Strongly
         avoided since negative values may
         be present.
+    pseudocount : float
+        pseudocount to use in normalization
 
     Returns
     -------
@@ -88,7 +91,8 @@ def plot_representative(motifs : Dict[int,np.ndarray],
 
     for fl,vals in motifs.items():
         if normalize:
-            vals = ut.normalize_expression(vals)
+            vals = ut.normalize_expression(vals,
+                                           c = pseudocount)
 
         ax[fl].scatter(crd[:,0],
                        crd[:,1],
@@ -113,6 +117,7 @@ def plot_families(counts : np.ndarray,
                   side_size : float = 300,
                   pltargs : dict = None,
                   split_title : list = None,
+                  pseudocount : float = 2,
                   )->List[Tuple[plt.Figure,np.ndarray]]:
 
     """ Plot pattern families
@@ -146,6 +151,8 @@ def plot_families(counts : np.ndarray,
         be splitted. First element is string
         to split by, second the element
         to keep.
+    pseudocount : float
+        pseudocount to use in normalization
     
     Returns
     -------
@@ -199,7 +206,8 @@ def plot_families(counts : np.ndarray,
         for ii in range(pos.shape[0]):
             vals = counts[:,pos[ii]]
             if normalize:
-                vals = ut.normalize_expression(vals)
+                vals = ut.normalize_expression(vals,
+                                               c = pseudocount)
 
             title = genes[pos[ii]]
             if split_title is not None:
@@ -482,6 +490,7 @@ def main(times_all :pd.DataFrame,
                                            crd = cd.real_crd,
                                            ncols = args.n_cols,
                                            pltargs = args.style_dict,
+                                           pseudocount = args.pseudocount,
                                            )
 
         reproname = osp.join(args.out_dir,''.join([sampletag,
@@ -498,6 +507,7 @@ def main(times_all :pd.DataFrame,
                                      pltargs = args.style_dict,
                                      split_title = args.split_title,
                                      side_size = args.side_size,
+                                     pseudocount = args.pseudocount,
                                       )
 
         for fl in range(len(family_plots)):

@@ -50,10 +50,10 @@ def topgenes(times_all,
     # automatically determine number
     # of top genes to use
     if args.n_genes is None:
-        args.n_genes= ut.get_inflection_point(times_all[VARS.SEL_COLUMN]\
-                                              .values[sort_genes],
-                                              sigma = args.sigma,
-                                              )
+        args.n_genes= ut.get_knee_point(times_all[VARS.SEL_COLUMN]\
+                                        .values[sort_genes],
+                                        sigma = args.sigma,
+                                        )
 
     # create visualizations
     sel_genes = sort_genes[0:int(args.n_genes)]

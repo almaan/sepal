@@ -19,6 +19,8 @@ import sys
 import numpy as np
 import pandas as pd
 
+import kneed
+
 import matplotlib.pyplot as plt
 from matplotlib import rcParams
 
@@ -28,9 +30,9 @@ from typing import Tuple,Dict,Union,List
 rcParams.update({'figure.max_open_warning': 0})
 
 def custom_print(title : str,
-           s: str,
-           )->None:
-    """custumo print"""
+                 s: str,
+                 )->None:
+    """custom print"""
     print("[{}] : {}".format(title,s))
 
 def eprint(s : str,
@@ -53,14 +55,15 @@ class VARS:
     SEL_COLUMN = 'average'
     PVAL_EPS = 1e-273
     PLTARGS = {'s':80,
-                'edgecolor':'none',
-                'cmap':plt.cm.magma,
-                }
+               'edgecolor':'none',
+               'cmap':plt.cm.magma,
+               }
 
 
 
 
 def normalize_expression(x : np.ndarray,
+                         c : float = 2,
                          )->np.ndarray:
     """Normalization procedure
 
@@ -74,7 +77,7 @@ def normalize_expression(x : np.ndarray,
     vector with transformed data
 
     """
-    return np.log2(x + 2)
+    return np.log2(x + c)
 
 
 def safe_div(x : Union[np.ndarray,float],
@@ -185,10 +188,10 @@ def clean_axes(ax : plt.Axes,
         ax.spines[pos].set_visible(False)
     return None
 
-def get_inflection_point(y : np.ndarray,
-                         x : np.ndarray = None,
-                         sigma : float = 10,
-                         )-> Union[int,float]:
+def get_knee_point(y : np.ndarray,
+                   x : np.ndarray = None,
+                   sensitivity : float = 1.5,
+                   )-> Union[int,float]:
 
     """Finds the inflection point
 
@@ -215,26 +218,15 @@ def get_inflection_point(y : np.ndarray,
 
     """
 
-    # smpoth observed values
-    f_times = gaussian_filter(y,
-                              sigma)
+    _kn = kneed.KneeLocator(x,
+                            y,
+                            S = sensitivity,
+                            curve = "convex",
+                            direction = "decreasing",
+                            )
 
-    # approximate second derivative
-    # and smooth the approximation
-    f_d2 = np.gradient(np.gradient(f_times))
-
-    # ignore the first instances
-    # where f'' < 0. To avoid
-    # edge effects
-    first = np.argmax(f_d2 > 0)
-    f_d2[0:first] = 1
-    # find point where f''
-    # is equal to or below zero
-    ipoint = np.argmax(f_d2 <= 0)
-
-    # return x value
-    # if provided otherwise
-    # index
+    ipoint = _kn.knee
+    ipoint -= 1
 
     if x is not None:
         ipoint = x[ipoint]
@@ -251,6 +243,7 @@ def plot_profiles(cnt : pd.DataFrame,
                     pltargs : dict = None,
                     split_title : Tuple[str,int] = None,
                     pval : bool = False,
+                    pseudocount : float = 2,
                     ) -> Tuple[plt.Figure,plt.Axes]:
 
     """Visualize a set of transcription
@@ -352,11 +345,12 @@ def plot_profiles(cnt : pd.DataFrame,
                    _pltargs[k] = None
                    use_rgba = True
 
-    # plot each genes
+    # plot each gene
     for ii in range(n_genes):
         vals = ncnt[:,ii].reshape(-1,)
         if normalize:
-            vals = normalize_expression(vals)
+            vals = normalize_expression(vals,
+                                        c = pseudocount)
         # conduct quantile scaling if specified
         if qscale is not None:
             if qscale > 0 and qscale < 1:
@@ -409,87 +403,6 @@ def plot_profiles(cnt : pd.DataFrame,
         clean_axes(ax[ii])
 
     return (fig,ax)
-
-# def plot_representative(motifs : Dict[int,np.ndarray],
-#                         crd : np.ndarray,
-#                         ncols : int,
-#                         side_size : float = 300,
-#                         pltargs : dict = None,
-#                         normalize : bool = True,
-#                         )->Tuple[plt.Figure,plt.Axes]:
-
-#     """Plot representative motifs
-
-#     Parameters:
-#     ----------
-
-#     motifs : Dict[int,np.ndarray]
-#         motif index and profile for respective
-#         family
-#     crd : np.ndarray
-#         coordinates to use. [n_locations x 2]
-#     ncols : int
-#         number of columns to use
-#     side_size : float
-#         side size of each subplot.
-#         Given in pixels
-#     pltargs : dict
-#         style dict for plot
-#     normalize : bool
-#         normalize motif expression. Strongly
-#         avoided since negative values may
-#         be present.
-
-#     Returns
-#     -------
-#     Tuple with figure and
-#     axes objects
-
-    
-#     """
-
-#     side_size *= 0.01
-
-#     # determine number of rows
-#     nrows = np.ceil(len(motifs) / ncols).astype(int)
-
-#     _pltargs = {'s':40,
-#                 'edgecolor':'black',
-#                 'cmap':plt.cm.PuRd,
-#                 }
-
-#     if pltargs is not None:
-#         for k,v in pltargs.items():
-#             _pltargs[k] = v
-#             if k == 'cmap' and isinstance(k,str):
-#                 try:
-#                     _pltargs[k] = eval("plt.cm." + v)
-#                 except:
-#                     _pltargs[k] = plt.cm.magma
-
-#     figsize = (1.2 * ncols * side_size,
-#                1.2 * nrows * side_size)
-
-#     fig,ax = plt.subplots(nrows,
-#                           ncols,
-#                           figsize = figsize)
-#     ax = ax.flatten()
-
-#     for fl,vals in motifs.items():
-#         if normalize:
-#             vals = normalize_expression(vals)
-
-#         ax[fl].scatter(crd[:,0],
-#                        crd[:,1],
-#                        c = vals,
-#                        **_pltargs,
-#                        )
-#         ax[fl].set_title("Repr. Motif {}".format(fl))
-
-#     for ii in range(ax.shape[0]):
-#         clean_axes(ax[ii])
-
-#     return fig,ax
 
 
 def timestamp() -> str:

@@ -92,18 +92,22 @@ def main(args : ARGS,
                                                            n_genes,
                                                            n_spots))
         # convert to CountData object
+        # TODO: remove time here
+        t_0 = time.time()
         cd = Data[args.array](cdata,
                               eps = 0.2,
                               normalize = False)
 
         np.random.seed(1337)
         # propagate system in time
-        t_0 = time.time()
+
+        #t_0 = time.time()
         times = m.propagate(cd,
                             dt = args.time_step,
                             num_workers = args.num_workers,
                             diffusion_rate = args.diffusion_rate,
                             thrs = args.threshold,
+                            pseudocount = args.pseudocount,
                             )
         t_end = time.time()
 
@@ -116,6 +120,8 @@ def main(args : ARGS,
         times.columns = pd.Index([sampletags[-1]])
 
         if args.timeit:
+            if not osp.exists(args.out_dir):
+                os.mkdir(args.out_dir)
             with open(osp.join(args.out_dir,
                                sampletags[-1] +"-timing.yaml"),"w") as f:
 
@@ -128,7 +134,7 @@ def main(args : ARGS,
     times_all = pd.concat(times_all,
                           axis = 1,
                           join = 'inner').astype(float)
-    
+
     mn = times_all.values.min(axis = 0).reshape(1,-1)
     mx = times_all.values.max(axis = 0).reshape(1,-1)
 

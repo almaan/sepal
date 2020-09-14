@@ -760,6 +760,7 @@ def propagate(cd : CountData,
               diffusion_rate : Union[float,np.ndarray] = 1.0,
               num_workers : Optional[int] = None,
               scale : bool = False,
+              pseudocount : float = 2,
               )-> pd.DataFrame:
 
     """Simulate Diffusion
@@ -791,6 +792,8 @@ def propagate(cd : CountData,
         number is used
     scale : bool
         do minmax scaling
+    pseudocount : float
+        pseudocount to use in normalization
 
     Returns:
     -------
@@ -824,7 +827,7 @@ def propagate(cd : CountData,
     # stabilizing normalization
     if normalize:
         ncnt = cd.cnt.values
-        ncnt = ut.normalize_expression(ncnt)
+        ncnt = ut.normalize_expression(ncnt,c = pseudocount)
         colMax = np.max(np.abs(ncnt),axis = 0).reshape(1,-1)
         ncnt = np.divide(ncnt,
                          colMax,
