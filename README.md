@@ -25,10 +25,10 @@ Running the setup will give you the minimal required install to compute the diff
 if you want to be able to use the analysis modules, you also need to install the recommended packages.
 To do this, simply (in the same directory) run:
 
-```shape
-pip install "sepal[full]" -e
+```sh
+pip install -e ".[full]"
 ```
-again, you may have to provide the `--user` flag, depending on user privileges. Also, you may have to use `pip3` if this is the way you've set up your `python-pip` interface.
+again, the `--user` could be necessary to include. Also, you may have to use `pip3` if this is the way you've set up your `python-pip` interface. If your using `conda` or virtual environments, follow their recommendations for installation of packages.
 
 This should install both a command line interface (CLI) and a standard package.
 To test and see whether the installation was successful you could try executing the command:
