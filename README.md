@@ -1,5 +1,8 @@
 # sepal : Identifying Transcription Profiles with Spatial Patterns by Diffusion-based Modeling
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4573237.svg)](https://doi.org/10.5281/zenodo.4573237)
+
+
 This repo contains:
 * the sepal python package, and installation files
 * tutorials and examples of usage (CLI and as a imported package)
