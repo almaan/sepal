@@ -162,33 +162,54 @@ class RawData:
 
             # read h5ad file
             tmp = aD.read_h5ad(pth)
-            
+            tmp.var_names_make_unique()
+
             n_spots,n_feats = tmp.shape
             # set pixel coordinates as x,y
-            if 'x' in tmp.obs.keys() and 'y' in tmp.obs.keys():
 
-                self._crd['pixel'] = np.zeros((n_spots,2))
-                self._crd['pixel'][:,0] = tmp.obs['x'].values
-                self._crd['pixel'][:,1] = tmp.obs['y'].values
+            if "spatial" in tmp.obsm.keys():
+                from scipy.sparse.csr import csr_matrix
+                gene_names = tmp.var.index
+                if isinstance(tmp.X,csr_matrix):
+                    dense = False
+                else:
+                    dense = True
 
+                self._crd['pixel']= tmp.obsm["spatial"][:,[1,0]]
+
+                if ("array_row" in tmp.obs.keys()) and\
+                   ("array_col" in tmp.obs.keys()):
+                    self._crd["array"] = np.zeros((n_spots,2))
+                    self._crd["array"][:,0] = tmp.obs.array_col.values
+                    self._crd["array"][:,1] = tmp.obs.array_row.values
+                else:
+                    self._crd["array"] = None
             else:
-                self._crd['pixel'] = None
-            # set array coordinates as _x,_y
-            if '_x' in tmp.obs.keys() and '_y' in tmp.obs.keys():
+                gene_names = tmp.var['name'].values
+                dense = True
+                if 'x' in tmp.obs.keys() and 'y' in tmp.obs.keys():
 
-                self._crd['array'] = np.zeros((n_spots,2))
-                self._crd['array'][:,0] = tmp.obs['_x'].values
-                self._crd['array'][:,1] = tmp.obs['_y'].values
-            else:
-                self._crd['array'] = np.array([])
+                    self._crd['pixel'] = np.zeros((n_spots,2))
+                    self._crd['pixel'][:,0] = tmp.obs['x'].values
+                    self._crd['pixel'][:,1] = tmp.obs['y'].values
+
+                else:
+                    self._crd['pixel'] = None
+                # set array coordinates as _x,_y
+                if '_x' in tmp.obs.keys() and '_y' in tmp.obs.keys():
+
+                    self._crd['array'] = np.zeros((n_spots,2))
+                    self._crd['array'][:,0] = tmp.obs['_x'].values
+                    self._crd['array'][:,1] = tmp.obs['_y'].values
+                else:
+                    self._crd['array'] = None
 
             # create data frame to hold count
             # data
-            self._cnt = pd.DataFrame(tmp.X,
-                                    index = tmp.obs.index,
-                                    columns = tmp.var['name'].values,
-                                    ) 
-
+            self._cnt = pd.DataFrame((tmp.X if dense else np.array(tmp.X.todense())),
+                                     index = tmp.obs.index,
+                                     columns = gene_names,
+                                    )
         else:
             print("[ERROR] : Something went wrong when loading data")
 

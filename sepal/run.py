@@ -78,10 +78,11 @@ def main(args : ARGS,
         if any([args.min_occurance > 0,args.min_counts > 0]):
             iprint("Removing Genes With : "\
                   " TOTAL_EXPR < {} | OCCURANCE < {}".format(args.min_counts,
-                                                            args.min_occurance))
+                                                             args.min_occurance))
             cdata.cnt = ut.filter_genes(cdata.cnt,
                                         min_occur = args.min_occurance,
                                         min_expr = args.min_counts,
+                                        max_zero_percentage = args.max_zero_fraction,
                                         filter_spurious = (not args.keep_spurious),
                                         )
 

@@ -138,6 +138,7 @@ def read_file(pth : str,
 def filter_genes(mat : pd.DataFrame,
                  min_occur : int = 5,
                  min_expr : int = 0,
+                 max_zero_percentage : float = 1.0,
                  filter_spurious : bool = True,
                  )->pd.DataFrame:
 
@@ -156,6 +157,10 @@ def filter_genes(mat : pd.DataFrame,
     min_expr : minimal total number of
         observed features (taken over all)
         locations for a gene
+    max_zero_fraction: float
+        a value in [0,1] giving the
+        upper bound for the fraction
+        of zero observations for a gene
     filter_spurious: bool
         filter mitochondrial and
         ribosomal genes
@@ -166,7 +171,15 @@ def filter_genes(mat : pd.DataFrame,
                          axis = 0) > min_occur).astype(int)
 
     keep_genes *= (np.sum(mat.values,
-                          axis = 0) > min_expr).astype(int)
+                        axis = 0) > min_expr).astype(int)
+
+    max_zero_percentage = min(max_zero_percentage,1)
+
+    n_tot = mat.shape[0]
+
+    keep_genes *= (np.sum(mat.values == 0,
+                          axis = 0,
+                        ) / n_tot <= max_zero_percentage).astype(int)
 
     if filter_spurious:
         keep_genes *= np.array([not bool(re.match('^RP|^MT',x.upper())) \
