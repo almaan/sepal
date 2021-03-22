@@ -181,7 +181,6 @@ class RawData:
                 self._crd['array'][:,1] = tmp.obs['_y'].values
             else:
                 self._crd['array'] = np.array([])
-                self._crd['pixel'] = np.array([])
 
             # create data frame to hold count
             # data
