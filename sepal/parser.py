@@ -55,6 +55,15 @@ def make_parser():
                                             )
                             )
 
+    run_parser.add_argument('-mzp','--max_zero_fraction',
+                            type = float,
+                            default = 1.0,
+                            help = ' '.join(['max fraction of spots',
+                                             'with zero counts allowed for gene',
+                                             ],
+                                            )
+                            )
+
     run_parser.add_argument('-ks','--keep_spurious',
                             default = False,
                             action = "store_true",
